@@ -2752,11 +2752,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\AssetTracking.Rfid.Api.csproj",
+      "projectUniqueName": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\AssetTracking.Rfid.Api.csproj",
       "projectName": "AssetTracking.Rfid.Api",
-      "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\AssetTracking.Rfid.Api.csproj",
+      "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\AssetTracking.Rfid.Api.csproj",
       "packagesPath": "C:\\Users\\Comp\\.nuget\\packages\\",
-      "outputPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\obj\\",
+      "outputPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -2778,11 +2778,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {
-              "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj"
+            "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {
+              "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj"
             },
-            "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj": {
-              "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj"
+            "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj": {
+              "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj"
             }
           }
         }

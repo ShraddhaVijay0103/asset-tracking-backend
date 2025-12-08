@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AssetTracking.Rfid.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+89a979a43c74164b9e217b58513059b2d03b8fb0")]
 [assembly: System.Reflection.AssemblyProductAttribute("AssetTracking.Rfid.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AssetTracking.Rfid.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

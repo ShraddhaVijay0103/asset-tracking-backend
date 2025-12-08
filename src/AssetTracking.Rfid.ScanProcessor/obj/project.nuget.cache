@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "F8UVfwxnCj8=",
+  "dgSpecHash": "ZpKDEwT56Ww=",
   "success": true,
-  "projectFilePath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.ScanProcessor\\AssetTracking.Rfid.ScanProcessor.csproj",
+  "projectFilePath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.ScanProcessor\\AssetTracking.Rfid.ScanProcessor.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Comp\\.nuget\\packages\\azure.core\\1.37.0\\azure.core.1.37.0.nupkg.sha512",
     "C:\\Users\\Comp\\.nuget\\packages\\efcore.namingconventions\\8.0.3\\efcore.namingconventions.8.0.3.nupkg.sha512",

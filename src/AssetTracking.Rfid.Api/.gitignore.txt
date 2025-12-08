@@ -1,0 +1,15 @@
+# Build folders
+bin/
+obj/
+ 
+# User-specific files
+*.user
+*.suo
+*.vs
+.vscode/
+ 
+# Logs
+*.log
+ 
+# Publish folder
+publish/

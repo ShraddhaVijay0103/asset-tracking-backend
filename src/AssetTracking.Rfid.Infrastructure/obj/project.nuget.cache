@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "3Zt4KGhgjBk=",
+  "dgSpecHash": "aWYuC2PZ2Pg=",
   "success": true,
-  "projectFilePath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj",
+  "projectFilePath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Comp\\.nuget\\packages\\efcore.namingconventions\\8.0.3\\efcore.namingconventions.8.0.3.nupkg.sha512",
     "C:\\Users\\Comp\\.nuget\\packages\\microsoft.entityframeworkcore\\8.0.0\\microsoft.entityframeworkcore.8.0.0.nupkg.sha512",

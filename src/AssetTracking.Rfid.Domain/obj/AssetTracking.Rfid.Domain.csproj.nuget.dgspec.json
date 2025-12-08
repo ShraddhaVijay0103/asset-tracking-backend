@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {}
+    "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {}
   },
   "projects": {
-    "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {
+    "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj",
+        "projectUniqueName": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj",
         "projectName": "AssetTracking.Rfid.Domain",
-        "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj",
+        "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj",
         "packagesPath": "C:\\Users\\Comp\\.nuget\\packages\\",
-        "outputPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\SouthernBotanical.Rfid.FullApi.v5.FixedSolution\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\obj\\",
+        "outputPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
