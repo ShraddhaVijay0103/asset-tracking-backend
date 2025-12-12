@@ -21,11 +21,11 @@ builder.Services.AddCors(options =>
 
 // Configure PostgreSQL connection
 var connectionString = builder.Configuration.GetConnectionString("Postgres")
-    ?? "Host=localhost;Port=5432;Database=sb_rfid;Username=postgres;Password=postgres;";
+    ?? "Host=localhost;Port=5432;Database=assetTracking;Username=postgres;Password=postgres;";
 
 // In Program.cs
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres") ?? "Host=localhost;Port=5432;Database=sb_rfid;Username=postgres;Password=postgres;")
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres") ?? "Host=localhost;Port=5432;Database=assetTracking;Username=postgres;Password=postgres;")
            .UseSnakeCaseNamingConvention());
 
 builder.Services.AddControllers()
@@ -40,7 +40,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.UseRouting();
 

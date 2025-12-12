@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "HlFywg2yWnY=",
+  "dgSpecHash": "HnfcaCzCUJk=",
   "success": true,
-  "projectFilePath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj",
+  "projectFilePath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

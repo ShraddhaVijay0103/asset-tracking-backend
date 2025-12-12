@@ -1,0 +1,9 @@
+{
+  "description": {
+    "language": "dotnet-isolated",
+    "extensions": [ ".dll" ],
+    "defaultExecutablePath": "dotnet",
+    "defaultWorkerPath": "AssetTracking.Rfid.ScanProcessor.dll",
+    "workerIndexing": "false"
+  }
+}

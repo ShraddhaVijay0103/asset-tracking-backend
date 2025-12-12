@@ -60,7 +60,26 @@ public class TrucksController : ControllerBase
         public Guid EquipmentTypeId { get; set; }
         public int RequiredCount { get; set; }
     }
+    [HttpGet("sites")]
+    public async Task<ActionResult<IEnumerable<Site>>> GetSites()
+    {
+        var list = await _db.Sites
+            .OrderBy(s => s.Name)
+            .ToListAsync();
 
+        return Ok(list);
+    }
+
+
+    [HttpGet("roles")]
+    public async Task<ActionResult<IEnumerable<Role>>> GetRoles()
+    {
+        var list = await _db.Roles
+            .OrderBy(r => r.Name)
+            .ToListAsync();
+
+        return Ok(list);
+    }
     [HttpPost("{id:guid}/assign")]
     public async Task<ActionResult> AddTemplate(Guid id, [FromBody] AssignTemplateRequest request)
     {
@@ -75,4 +94,53 @@ public class TrucksController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(template);
     }
+    public class CreateTruckRequest
+    {
+        public string TruckNumber { get; set; } = string.Empty;
+        public string DriverName { get; set; } = string.Empty;
+
+        public Guid SiteId { get; set; }
+    }
+
+    [HttpPost("create")]
+    public async Task<ActionResult<Truck>> CreateTruck([FromBody] CreateTruckRequest request)
+    {
+        // Check duplicate truck number
+        var exists = await _db.Trucks
+            .AnyAsync(t => t.TruckNumber == request.TruckNumber);
+
+        if (exists)
+            return BadRequest("Truck with this number already exists.");
+
+        // Create driver
+        var driver = new Driver
+        {
+            DriverId = Guid.NewGuid(),
+            FullName = request.DriverName
+        };
+
+        // Save driver first so DriverId is available
+        _db.Drivers.Add(driver);
+        await _db.SaveChangesAsync();
+
+        // Create truck
+        var truck = new Truck
+        {
+            TruckId = Guid.NewGuid(),
+            TruckNumber = request.TruckNumber,
+            Description = "",        // optional
+            DriverId = driver.DriverId,
+            SiteId = request.SiteId
+        };
+
+        _db.Trucks.Add(truck);
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Truck created successfully",
+            truck
+        });
+    }
+
 }

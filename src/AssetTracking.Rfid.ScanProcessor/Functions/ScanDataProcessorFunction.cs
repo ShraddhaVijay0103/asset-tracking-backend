@@ -38,86 +38,86 @@ public class ScanDataProcessorFunction
         _config = config;
     }
 
-    //// Runs every minute
-    //[Function("ScanDataProcessor")] 
-    //public async Task RunAsync(
-    //    [TimerTrigger("0 */1 * * * *")] TimerInfo timerInfo) // every 1 minute
-    //{
-    //    var now = DateTime.UtcNow;
-    //    var lookbackMinutes = _config.GetValue<int>("ScanProcessor:LookbackMinutes", 30);
-    //    var sessionWindowSeconds = _config.GetValue<int>("ScanProcessor:SessionWindowSeconds", 20);
+    // Runs every minute
+    [Function("ScanDataProcessor")]
+    public async Task RunAsync(
+        [TimerTrigger("0 */1 * * * *")] TimerInfo timerInfo) // every 1 minute
+    {
+        var now = DateTime.UtcNow;
+        var lookbackMinutes = _config.GetValue<int>("ScanProcessor:LookbackMinutes", 30);
+        var sessionWindowSeconds = _config.GetValue<int>("ScanProcessor:SessionWindowSeconds", 20);
 
-    //    var since = now.AddMinutes(-lookbackMinutes);
+        var since = now.AddMinutes(-lookbackMinutes);
 
-    //    _logger.LogInformation("ScanDataProcessor started at {Time}, lookback: {Since}", now, since);
+        _logger.LogInformation("ScanDataProcessor started at {Time}, lookback: {Since}", now, since);
 
-    //    // 1) Load unprocessed scans in lookback window
-    //    var scans = await _db.RfidScans
-    //        .Where(s => s.ProcessedAt == null && s.Timestamp >= since)
-    //        .OrderBy(s => s.ReaderId)
-    //        .ThenBy(s => s.Timestamp)
-    //        .ToListAsync();
+        // 1) Load unprocessed scans in lookback window
+        var scans = await _db.RfidScans
+            .Where(s => s.ProcessedAt == null && s.Timestamp >= since)
+            .OrderBy(s => s.ReaderId)
+            .ThenBy(s => s.Timestamp)
+            .ToListAsync();
 
-    //    if (!scans.Any())
-    //    {
-    //        _logger.LogInformation("No unprocessed scans found.");
-    //        return;
-    //    }
+        if (!scans.Any())
+        {
+            _logger.LogInformation("No unprocessed scans found.");
+            return;
+        }
 
-    //    _logger.LogInformation("Found {Count} unprocessed scans.", scans.Count);
+        _logger.LogInformation("Found {Count} unprocessed scans.", scans.Count);
 
-    //    // 2) Group into sessions: ReaderId + time window
-    //    var sessions = GroupIntoSessions(scans, TimeSpan.FromSeconds(sessionWindowSeconds));
+        // 2) Group into sessions: ReaderId + time window
+        var sessions = GroupIntoSessions(scans, TimeSpan.FromSeconds(sessionWindowSeconds));
 
-    //    // Load templates & rules just once
-    //    var templates = await _db.TruckEquipmentTemplates
-    //        .Include(t => t.EquipmentType)
-    //        .ToListAsync();
+        // Load templates & rules just once
+        var templates = await _db.TruckEquipmentTemplates
+            .Include(t => t.EquipmentType)
+            .ToListAsync();
 
-    //    var alertRules = await _db.AlertRules.FirstOrDefaultAsync()
-    //        ?? new AlertRules
-    //        {
-    //            AlertRulesId = Guid.NewGuid(),
-    //            MissingItemThreshold = 1,
-    //            OverdueMinutes = 60,
-    //            NotifyEmail = true,
-    //            NotifySms = true,
-    //            NotifyPush = false
-    //        };
+        var alertRules = await _db.AlertRules.FirstOrDefaultAsync()
+            ?? new AlertRules
+            {
+                AlertRulesId = Guid.NewGuid(),
+                MissingItemThreshold = 1,
+                OverdueMinutes = 60,
+                NotifyEmail = true,
+                NotifySms = true,
+                NotifyPush = false
+            };
 
-    //    if (alertRules.AlertRulesId == Guid.Empty)
-    //    {
-    //        alertRules.AlertRulesId = Guid.NewGuid();
-    //        _db.AlertRules.Add(alertRules);
-    //    }
+        if (alertRules.AlertRulesId == Guid.Empty)
+        {
+            alertRules.AlertRulesId = Guid.NewGuid();
+            _db.AlertRules.Add(alertRules);
+        }
 
-    //    // Cache EPC -> Equipment
-    //    var epcs = sessions.SelectMany(s => s.Scans).Select(s => s.Epc).Distinct().ToList();
-    //    var equipmentByEpc = await _db.Equipment
-    //        .Include(e => e.EquipmentType)
-    //        .Include(e => e.RfidTag)
-    //        .Where(e => e.RfidTag != null && epcs.Contains(e.RfidTag.Epc))
-    //        .ToListAsync();
+        // Cache EPC -> Equipment
+        var epcs = sessions.SelectMany(s => s.Scans).Select(s => s.Epc).Distinct().ToList();
+        var equipmentByEpc = await _db.Equipment
+            .Include(e => e.EquipmentType)
+            .Include(e => e.RfidTag)
+            .Where(e => e.RfidTag != null && epcs.Contains(e.RfidTag.Epc))
+            .ToListAsync();
 
-    //    // Process each session -> GateEvent + GateEventItems + Alerts
-    //    foreach (var session in sessions)
-    //    {
-    //        await ProcessSessionAsync(session, equipmentByEpc, templates, alertRules, now);
-    //    }
+        // Process each session -> GateEvent + GateEventItems + Alerts
+        foreach (var session in sessions)
+        {
+            await ProcessSessionAsync(session, equipmentByEpc, templates, alertRules, now);
+        }
 
-    //    // Mark scans as processed
-    //    foreach (var scan in scans)
-    //    {
-    //        scan.ProcessedAt = now;
-    //    }
+        // Mark scans as processed
+        foreach (var scan in scans)
+        {
+            scan.ProcessedAt = now;
+        }
 
-    //    await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync();
 
-    //    // Late return / not returned alerts (truck left long ago but no return)
-    //    await ProcessLateReturnAlertsAsync(alertRules, now);
+        // Late return / not returned alerts (truck left long ago but no return)
+        await ProcessLateReturnAlertsAsync(alertRules, now);
 
-    //    _logger.LogInformation("ScanDataProcessor finished at {Time}", DateTime.UtcNow);
-    //}
+        _logger.LogInformation("ScanDataProcessor finished at {Time}", DateTime.UtcNow);
+    }
 
     /// <summary>
     /// Group raw scans into reader-based time sessions (one truck crossing).

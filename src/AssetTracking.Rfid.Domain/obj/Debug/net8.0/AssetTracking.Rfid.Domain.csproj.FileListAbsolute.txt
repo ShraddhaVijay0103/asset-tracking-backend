@@ -31,3 +31,15 @@ D:\Projects\Landscaping-AssetTracking\Óffshore\AssetTracking.Rfid\src\AssetTrac
 D:\Projects\Landscaping-AssetTracking\Óffshore\AssetTracking.Rfid\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\refint\AssetTracking.Rfid.Domain.dll
 D:\Projects\Landscaping-AssetTracking\Óffshore\AssetTracking.Rfid\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\AssetTracking.Rfid.Domain.pdb
 D:\Projects\Landscaping-AssetTracking\Óffshore\AssetTracking.Rfid\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\ref\AssetTracking.Rfid.Domain.dll
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\bin\Debug\net8.0\AssetTracking.Rfid.Domain.deps.json
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\bin\Debug\net8.0\AssetTracking.Rfid.Domain.dll
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\bin\Debug\net8.0\AssetTracking.Rfid.Domain.pdb
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\AssetTracking.Rfid.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\AssetTracking.Rfid.Domain.AssemblyInfoInputs.cache
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\AssetTracking.Rfid.Domain.AssemblyInfo.cs
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\AssetTracking.Rfid.Domain.csproj.CoreCompileInputs.cache
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\AssetTracking.Rfid.Domain.sourcelink.json
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\AssetTracking.Rfid.Domain.dll
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\refint\AssetTracking.Rfid.Domain.dll
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\AssetTracking.Rfid.Domain.pdb
+C:\AssetTracking_Backend\be-asset-tracking\src\AssetTracking.Rfid.Domain\obj\Debug\net8.0\ref\AssetTracking.Rfid.Domain.dll

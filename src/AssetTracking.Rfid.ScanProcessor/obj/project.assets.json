@@ -163,6 +163,23 @@
           "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Abstractions.dll": {}
         }
       },
+      "Microsoft.Azure.Functions.Worker.Extensions.Timer/4.3.1": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.Azure.Functions.Worker.Core": "1.18.0",
+          "Microsoft.Azure.Functions.Worker.Extensions.Abstractions": "1.3.0"
+        },
+        "compile": {
+          "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Timer.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Timer.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Microsoft.Azure.Functions.Worker.Grpc/1.16.0": {
         "type": "package",
         "dependencies": {
@@ -1323,6 +1340,20 @@
         "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Abstractions.dll",
         "microsoft.azure.functions.worker.extensions.abstractions.1.3.0.nupkg.sha512",
         "microsoft.azure.functions.worker.extensions.abstractions.nuspec"
+      ]
+    },
+    "Microsoft.Azure.Functions.Worker.Extensions.Timer/4.3.1": {
+      "sha512": "uNKWSuelJi2SG2e6Dc+s7l3yBkXZCkYnF/OcssXlONY+vM+AP+rm/wPR7iJ5xeDgOp5sOCKHEu5XYsbhZsfCRg==",
+      "type": "package",
+      "path": "microsoft.azure.functions.worker.extensions.timer/4.3.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "icon.png",
+        "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Timer.dll",
+        "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Timer.xml",
+        "microsoft.azure.functions.worker.extensions.timer.4.3.1.nupkg.sha512",
+        "microsoft.azure.functions.worker.extensions.timer.nuspec"
       ]
     },
     "Microsoft.Azure.Functions.Worker.Grpc/1.16.0": {
@@ -2888,6 +2919,7 @@
       "AssetTracking.Rfid.Domain >= 1.0.0",
       "AssetTracking.Rfid.Infrastructure >= 1.0.0",
       "Microsoft.Azure.Functions.Worker >= 1.22.0",
+      "Microsoft.Azure.Functions.Worker.Extensions.Timer >= 4.3.1",
       "Microsoft.Azure.Functions.Worker.Sdk >= 1.15.0",
       "Microsoft.EntityFrameworkCore >= 8.0.0",
       "Microsoft.Extensions.Hosting >= 8.0.0",
@@ -2895,23 +2927,23 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Comp\\.nuget\\packages\\": {},
+    "C:\\Users\\Sneha\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.ScanProcessor\\AssetTracking.Rfid.ScanProcessor.csproj",
+      "projectUniqueName": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.ScanProcessor\\AssetTracking.Rfid.ScanProcessor.csproj",
       "projectName": "AssetTracking.Rfid.ScanProcessor",
-      "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.ScanProcessor\\AssetTracking.Rfid.ScanProcessor.csproj",
-      "packagesPath": "C:\\Users\\Comp\\.nuget\\packages\\",
-      "outputPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.ScanProcessor\\obj\\",
+      "projectPath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.ScanProcessor\\AssetTracking.Rfid.ScanProcessor.csproj",
+      "packagesPath": "C:\\Users\\Sneha\\.nuget\\packages\\",
+      "outputPath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.ScanProcessor\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\Comp\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\Sneha\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -2927,11 +2959,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {
-              "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj"
+            "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {
+              "projectPath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj"
             },
-            "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj": {
-              "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj"
+            "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj": {
+              "projectPath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj"
             }
           }
         }
@@ -2955,6 +2987,10 @@
           "Microsoft.Azure.Functions.Worker": {
             "target": "Package",
             "version": "[1.22.0, )"
+          },
+          "Microsoft.Azure.Functions.Worker.Extensions.Timer": {
+            "target": "Package",
+            "version": "[4.3.1, )"
           },
           "Microsoft.Azure.Functions.Worker.Sdk": {
             "target": "Package",
@@ -2989,7 +3025,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.306/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<AlertRules> AlertRules => Set<AlertRules>();
     public DbSet<Role> Roles => Set<Role>();
+    public DbSet<Site> Sites => Set<Site>();
     public DbSet<User> Users => Set<User>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ReaderHeartbeat> ReaderHeartbeats => Set<ReaderHeartbeat>();

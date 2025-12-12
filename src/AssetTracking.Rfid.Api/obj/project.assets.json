@@ -2746,23 +2746,23 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Comp\\.nuget\\packages\\": {},
+    "C:\\Users\\Sneha\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\AssetTracking.Rfid.Api.csproj",
+      "projectUniqueName": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Api\\AssetTracking.Rfid.Api.csproj",
       "projectName": "AssetTracking.Rfid.Api",
-      "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\AssetTracking.Rfid.Api.csproj",
-      "packagesPath": "C:\\Users\\Comp\\.nuget\\packages\\",
-      "outputPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Api\\obj\\",
+      "projectPath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Api\\AssetTracking.Rfid.Api.csproj",
+      "packagesPath": "C:\\Users\\Sneha\\.nuget\\packages\\",
+      "outputPath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Api\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\Comp\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\Sneha\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -2778,11 +2778,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {
-              "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj"
+            "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj": {
+              "projectPath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Domain\\AssetTracking.Rfid.Domain.csproj"
             },
-            "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj": {
-              "projectPath": "D:\\Projects\\Landscaping-AssetTracking\\Óffshore\\AssetTracking.Rfid\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj"
+            "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj": {
+              "projectPath": "C:\\AssetTracking_Backend\\be-asset-tracking\\src\\AssetTracking.Rfid.Infrastructure\\AssetTracking.Rfid.Infrastructure.csproj"
             }
           }
         }
@@ -2833,7 +2833,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.306/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
