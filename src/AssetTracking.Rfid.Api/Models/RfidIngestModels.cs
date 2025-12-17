@@ -4,7 +4,7 @@ public class RfidEvent
 {
     public Guid ScanId { get; set; }
     public string Epc { get; set; } = string.Empty;
-    public int Rssi { get; set; }
+    public double Rssi { get; set; }
     public DateTime Timestamp { get; set; }
 }
 

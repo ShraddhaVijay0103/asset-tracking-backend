@@ -26,7 +26,7 @@ public class User
     [Column("siteid")]
     public Guid SiteId { get; set; }
         public Site? Site { get; set; }
-
-        public Guid RoleId { get; set; }
+    [Column("role_id")]
+    public Guid RoleId { get; set; }
         public Role? Role { get; set; }
     }

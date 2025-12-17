@@ -147,6 +147,11 @@ public class AdminUsersController : ControllerBase
         });
 
     }
-
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<EquipmentType>>> GetAll()
+    {
+        var list = await _db.RfidTags.ToListAsync();
+        return Ok(list);
+    }
 }
 
