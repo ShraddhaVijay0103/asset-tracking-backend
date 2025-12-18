@@ -44,6 +44,7 @@ public class AdminRfidController : ControllerBase
 
         return Ok(new { equipment.EquipmentId, equipment.Name, TagEpc = tag.Epc });
     }
+
     [HttpGet]
     public async Task<ActionResult<IEnumerable<EquipmentType>>> GetAll()
     {
