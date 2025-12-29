@@ -22,6 +22,10 @@ public class Truck
     [Column("siteid")]
     public Guid SiteId { get; set; }
     public Site? Site { get; set; }
+
+    [Column("rfid_tag_id")]
+    public Guid RfidTagId { get; set; }
+    public RfidTag? RfidTag { get; set; }
     public ICollection<GateEvent> GateEvents { get; set; } = new List<GateEvent>();
     public ICollection<TruckEquipmentTemplate> EquipmentTemplates { get; set; } = new List<TruckEquipmentTemplate>();
 }

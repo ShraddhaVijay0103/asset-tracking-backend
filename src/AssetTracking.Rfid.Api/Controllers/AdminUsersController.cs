@@ -1,3 +1,4 @@
+using AssetTracking.Rfid.Api;
 using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
@@ -16,14 +17,14 @@ public class AdminUsersController : ControllerBase
 {
 
     private readonly AppDbContext _db;
+    private readonly JwtToken _jwtToken;
 
-    public AdminUsersController(AppDbContext db)
-
+    public AdminUsersController(AppDbContext db, JwtToken jwtToken)
     {
-
         _db = db;
-
+        _jwtToken = jwtToken;
     }
+
 
     [HttpGet]
 
@@ -100,53 +101,37 @@ public class AdminUsersController : ControllerBase
     }
 
     [HttpPost("login")]
-
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
-
     {
-
         var user = await _db.Users
-
             .FirstOrDefaultAsync(x => x.Email == request.Email);
 
         if (user == null)
-
-        {
-
             return BadRequest(new { message = "User does not exist." });
 
-        }
-
         if (user.Password != request.Password)
-
-        {
-
             return BadRequest(new { message = "Invalid password." });
 
-        }
+        var role = await _db.Roles
+            .FirstOrDefaultAsync(x => x.RoleId == user.RoleId);
 
+        var token = _jwtToken.GenerateJwtToken(user, role?.Name);
 
         return Ok(new
-
         {
-
             message = "Login successful.",
-
+            token,
             user = new
-
             {
-
                 user.UserId,
-
+                user.FullName,
                 user.Email,
-
-                user.RoleId
-
+                user.SiteId,
+                user.RoleId,
+                RoleName = role?.Name
             }
-
         });
-
     }
-   
+
 }
 

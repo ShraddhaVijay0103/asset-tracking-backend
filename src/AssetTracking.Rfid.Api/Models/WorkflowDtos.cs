@@ -3,7 +3,7 @@ namespace AssetTracking.Rfid.Api.Models;
 public class WorkflowScanItem
 {
     public string Epc { get; set; } = string.Empty;
-    public int Rssi { get; set; }
+    public double Rssi { get; set; }
 }
 
 public class CheckoutRequest

@@ -66,13 +66,16 @@ public class ScanDataProcessorFunction
 
         _logger.LogInformation("Found {Count} unprocessed scans.", scans.Count);
 
+        //find truck maching by rfid tags
+
+
         // 2) Group into sessions: ReaderId + time window
         var sessions = GroupIntoSessions(scans, TimeSpan.FromSeconds(sessionWindowSeconds));
 
-        // Load templates & rules just once
-        var templates = await _db.TruckEquipmentTemplates
-            .Include(t => t.EquipmentType)
-            .ToListAsync();
+        //// Load templates & rules just once
+        //var templates = await _db.TruckEquipmentTemplates
+        //    .Include(t => t.EquipmentType)
+        //    .ToListAsync();
 
         var alertRules = await _db.AlertRules.FirstOrDefaultAsync()
             ?? new AlertRules
@@ -93,30 +96,105 @@ public class ScanDataProcessorFunction
 
         // Cache EPC -> Equipment
         var epcs = sessions.SelectMany(s => s.Scans).Select(s => s.Epc).Distinct().ToList();
+
+        var trucksByEpc = await _db.Trucks
+            .Include(t => t.RfidTag)          // needed to access EPC
+            .Where(t => t.RfidTag != null && epcs.Contains(t.RfidTag.Epc))
+            .ToListAsync();
+
         var equipmentByEpc = await _db.Equipment
             .Include(e => e.EquipmentType)
             .Include(e => e.RfidTag)
             .Where(e => e.RfidTag != null && epcs.Contains(e.RfidTag.Epc))
             .ToListAsync();
-
+        GateEvent? gate = null;
         // Process each session -> GateEvent + GateEventItems + Alerts
         foreach (var session in sessions)
         {
-            await ProcessSessionAsync(session, equipmentByEpc, templates, alertRules, now);
-        }
+             gate = await ProcessSessionAsync(session, equipmentByEpc, trucksByEpc, alertRules, now);
 
+        }
+        await _db.SaveChangesAsync();
         // Mark scans as processed
         foreach (var scan in scans)
         {
             scan.ProcessedAt = now;
+            if (gate != null)
+            {
+                await HandleTruckEquipmentAssignmentAsync(scan.Epc,gate, now);
+            }
+
         }
 
         await _db.SaveChangesAsync();
 
         // Late return / not returned alerts (truck left long ago but no return)
         await ProcessLateReturnAlertsAsync(alertRules, now);
+        
+        await _db.SaveChangesAsync();
+
 
         _logger.LogInformation("ScanDataProcessor finished at {Time}", DateTime.UtcNow);
+    }
+    private async Task HandleTruckEquipmentAssignmentAsync(
+    string epc,
+    GateEvent gate,
+    DateTime now)
+    {
+        // Load GateEventItems to know which equipment was scanned
+        var gateEventItems = await _db.GateEventItems
+            .Where(i => i.GateEventId == gate.GateEventId)
+            .ToListAsync();
+
+        if (!gateEventItems.Any())
+            return;
+
+        if (string.Equals(gate.EventType, "Entry", StringComparison.OrdinalIgnoreCase))
+        {
+            // ENTRY → Assign equipment to truck
+            foreach (var item in gateEventItems)
+            {
+                var existingAssignment = await _db.TruckEquipmentAssignments
+                    .FirstOrDefaultAsync(a =>
+                        a.TruckId == gate.TruckId &&
+                        a.EquipmentId == item.EquipmentId &&
+                        a.ReturnedAt == null);
+
+                // Prevent duplicate active assignment
+                if (existingAssignment != null)
+                    continue;
+
+                var assignment = new TruckEquipmentAssignment
+                {
+                    AssignmentId = Guid.NewGuid(),
+                    TruckId = gate.TruckId,
+                    EquipmentId = item.EquipmentId,
+                    AssignedAt = now,
+                    ReturnedAt = null
+                };
+
+                _db.TruckEquipmentAssignments.Add(assignment);
+            }
+        }
+        else if (string.Equals(gate.EventType, "Exit", StringComparison.OrdinalIgnoreCase))
+        {
+            // EXIT → Return equipment
+            foreach (var item in gateEventItems)
+            {
+                var assignment = await _db.TruckEquipmentAssignments
+                    .FirstOrDefaultAsync(a =>
+                        a.TruckId == gate.TruckId &&
+                        a.EquipmentId == item.EquipmentId &&
+                        a.ReturnedAt == null);
+
+                if (assignment != null)
+                {
+                    assignment.ReturnedAt = now;
+                }
+            }
+        }
+
+        await _db.SaveChangesAsync();
     }
 
     /// <summary>
@@ -185,12 +263,13 @@ public class ScanDataProcessorFunction
     /// - Exit (Check-Out): compare against expected template (kit) and raise missing alerts
     /// - Entry (Check-In): compare with last Exit to detect items not returned
     /// </summary>
-    private async Task ProcessSessionAsync(
-        ScanSession session,
-        List<Equipment> equipmentByEpc,
-        List<TruckEquipmentTemplate> templates,
-        AlertRules alertRules,
-        DateTime now)
+
+    private async Task<GateEvent?> ProcessSessionAsync(
+     ScanSession session,
+     List<Equipment> equipmentByEpc,
+     List<Truck> trucksByEpc,
+     AlertRules alertRules,
+     DateTime now)
     {
         // Map EPCs -> Equipment
         var scannedEpcs = session.Scans.Select(s => s.Epc).Distinct().ToList();
@@ -198,19 +277,33 @@ public class ScanDataProcessorFunction
             .Where(e => e.RfidTag != null && scannedEpcs.Contains(e.RfidTag.Epc))
             .ToList();
 
+        var scannedTruck = trucksByEpc
+            .Where(e => e.RfidTag != null && scannedEpcs.Contains(e.RfidTag.Epc))
+            .ToList();
+
         if (!scannedEquipment.Any())
         {
             // For now, ignore sessions with no known equipment
             _logger.LogInformation("Session at reader {ReaderId} has no known equipment EPCs.", session.ReaderId);
-            return;
+            return null;
         }
+
+        var scannedTruckIds = scannedTruck
+            .Select(t => t.TruckId)
+            .Distinct()
+            .ToList();
+
+        // Load templates & rules just once
+        var templates = await _db.TruckEquipmentTemplates
+            .Where(t => scannedTruckIds.Contains(t.TruckId))
+            .ToListAsync();
 
         // 1) Determine truck by best matching template (Southern Botanical standard kits)
         var bestTruckId = FindBestMatchingTruck(scannedEquipment, templates);
         if (bestTruckId == Guid.Empty)
         {
             _logger.LogWarning("No matching truck found for session at reader {ReaderId}.", session.ReaderId);
-            return;
+            return null;
         }
 
         // Load truck + driver
@@ -221,12 +314,25 @@ public class ScanDataProcessorFunction
         if (truck == null)
         {
             _logger.LogWarning("Truck {TruckId} not found in DB.", bestTruckId);
-            return;
+            return null;
         }
 
         // 2) Determine event type (Entry vs Exit) from Reader.Direction
         // NOTE: RfidScan.ReaderId is string; we assume it stores Reader.ReaderId.ToString()
-        var reader = await _db.Readers.FirstOrDefaultAsync(r => r.ReaderId.ToString() == session.ReaderId);
+        var readerIdString = session.ReaderId?.Trim();
+
+        if (!Guid.TryParse(readerIdString, out var readerId))
+        {
+            throw new InvalidOperationException($"Invalid ReaderId: {readerIdString}");
+        }
+
+        var reader = await _db.Readers.FirstOrDefaultAsync(r => r.ReaderId == readerId);
+
+        if (reader == null)
+        {
+            throw new InvalidOperationException($"Reader not found: {readerId}");
+        }
+
         var eventType = reader?.Direction;
         if (string.IsNullOrWhiteSpace(eventType))
         {
@@ -294,7 +400,11 @@ public class ScanDataProcessorFunction
                 };
                 _db.Alerts.Add(alert);
 
-                _logger.LogWarning("Exit event: truck {Truck}, driver {Driver}, missing {MissingCount} item(s).", truck.TruckNumber, truck.Driver?.FullName, missingCount);
+                _logger.LogWarning(
+                    "Exit event: truck {Truck}, driver {Driver}, missing {MissingCount} item(s).",
+                    truck.TruckNumber,
+                    truck.Driver?.FullName,
+                    missingCount);
             }
         }
         // 6) Entry (Check-In) logic – compare with last Exit to find items not returned
@@ -340,19 +450,28 @@ public class ScanDataProcessorFunction
                     };
                     _db.Alerts.Add(alert);
 
-                    _logger.LogWarning("Entry event: truck {Truck}, driver {Driver}, missing {MissingCount} item(s): {MissingList}.",
+                    _logger.LogWarning(
+                        "Entry event: truck {Truck}, driver {Driver}, missing {MissingCount} item(s): {MissingList}.",
                         truck.TruckNumber,
                         truck.Driver?.FullName,
                         missingEquipNames.Count,
                         missingList);
                 }
+                return gateEvent;
             }
             else
             {
-                _logger.LogInformation("Entry event for truck {TruckNumber}, but no previous Exit event found.", truck.TruckNumber);
+                _logger.LogInformation(
+                    "Entry event for truck {TruckNumber}, but no previous Exit event found.",
+                    truck.TruckNumber);
             }
+            return gateEvent;
         }
+
+        // ✅ REQUIRED: covers Exit path and future event types
+        return gateEvent;
     }
+
 
     /// <summary>
     /// Choose best matching truck based on how many equipment types match its template.

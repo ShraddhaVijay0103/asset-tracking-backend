@@ -29,7 +29,7 @@ public class GateEvent
 
     public Driver? Driver { get; set; }
 
-    [Column("status")]
+      [Column("status")]
     public string Status { get; set; } = "Pending"; // Pending / Approved / Rejected
 
     [Column("notes")]
