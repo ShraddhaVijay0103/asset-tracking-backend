@@ -1,12 +1,14 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using AssetTracking.Rfid.Infrastructure.Persistence;
 using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
+using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/workflow")]
 public class WorkflowController : ControllerBase
 {
@@ -17,12 +19,14 @@ public class WorkflowController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpPost("checkout")]
     public async Task<ActionResult<WorkflowResult>> Checkout([FromBody] CheckoutRequest request)
     {
         return await HandleGateWorkflow(request.TruckId, request.DriverId, request.ReaderId, request.SiteId, request.Items, "Exit");
     }
 
+    [AllowAnonymous]
     [HttpPost("checkin")]
     public async Task<ActionResult<WorkflowResult>> Checkin([FromBody] CheckinRequest request)
     {

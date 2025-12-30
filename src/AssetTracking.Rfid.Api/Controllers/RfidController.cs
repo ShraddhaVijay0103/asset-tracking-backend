@@ -1,12 +1,14 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using AssetTracking.Rfid.Infrastructure.Persistence;
 using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
+using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/rfid")]
 public class RfidController : ControllerBase
 {
@@ -17,6 +19,7 @@ public class RfidController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpPost("ingest")]
     public async Task<ActionResult> Ingest([FromBody] RfidEventBatch batch)
     {

@@ -1,11 +1,13 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/admin/audit-logs")]
 public class AdminAuditLogsController : ControllerBase
 {
@@ -16,6 +18,7 @@ public class AdminAuditLogsController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<AuditLog>>> GetAuditLogs()
     {

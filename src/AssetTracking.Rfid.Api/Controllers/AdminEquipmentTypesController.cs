@@ -1,11 +1,13 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/admin/equipment-types")]
 public class AdminEquipmentTypesController : ControllerBase
 {
@@ -16,6 +18,7 @@ public class AdminEquipmentTypesController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<EquipmentType>>> GetAll()
     {
@@ -23,6 +26,7 @@ public class AdminEquipmentTypesController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpPost]
     public async Task<ActionResult<EquipmentType>> Create([FromBody] EquipmentType type)
     {

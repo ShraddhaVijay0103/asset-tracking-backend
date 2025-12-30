@@ -1,12 +1,14 @@
 ﻿using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class TrucksController : ControllerBase
 {
@@ -17,6 +19,7 @@ public class TrucksController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TruckListResponse>>> GetAll()
     {
@@ -35,6 +38,7 @@ public class TrucksController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<Truck>> GetById(Guid id)
     {
@@ -46,6 +50,7 @@ public class TrucksController : ControllerBase
         return Ok(truck);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:guid}/assignment")]
     public async Task<ActionResult> GetCurrentAssignment(Guid id)
     {
@@ -69,6 +74,8 @@ public class TrucksController : ControllerBase
         public Guid EquipmentTypeId { get; set; }
         public int RequiredCount { get; set; }
     }
+
+    [AllowAnonymous]
     [HttpGet("sites")]
     public async Task<ActionResult<IEnumerable<Site>>> GetSites()
     {
@@ -79,7 +86,7 @@ public class TrucksController : ControllerBase
         return Ok(list);
     }
 
-
+    [AllowAnonymous]
     [HttpGet("roles")]
     public async Task<ActionResult<IEnumerable<Role>>> GetRoles()
     {
@@ -95,6 +102,8 @@ public class TrucksController : ControllerBase
         public string DriverName { get; set; } = string.Empty;
         public Guid SiteId { get; set; }
     }
+
+    [AllowAnonymous]
     [HttpPut("{id:guid}/assign")]
     public async Task<ActionResult> AddTemplate(Guid id, [FromBody] CreateTruckRequest request)
     {
@@ -125,6 +134,7 @@ public class TrucksController : ControllerBase
         });
     }
 
+    [AllowAnonymous]
     [HttpPost("create")]
     public async Task<ActionResult<Truck>> CreateTruck([FromBody] CreateTruckRequest request)
     {
@@ -171,6 +181,7 @@ public class TrucksController : ControllerBase
         });
     }
 
+    [AllowAnonymous]
     [HttpGet("trucks")]
     public async Task<ActionResult<IEnumerable<Truck>>> GetTruck()
     {
@@ -185,9 +196,10 @@ public class TrucksController : ControllerBase
     {
         public Guid userId { get; set; }
         public string driverName { get; set; } = string.Empty;
-     
+
     }
 
+    [AllowAnonymous]
     [HttpGet("drivers")]
     public async Task<ActionResult<IEnumerable<DriverRequest>>> GetDrivers()
     {
@@ -203,10 +215,48 @@ public class TrucksController : ControllerBase
         return Ok(drivers);
     }
 
+    [AllowAnonymous]
+    [HttpGet("TruckData")]
+    public async Task<ActionResult<IEnumerable<TruckEquipmentAssignmentDto>>> GetTruckDataAll()
+    {
+        var list = await _db.Trucks
+            .Include(t => t.Driver)
+             .Include(d => d.RfidTag)
+            .OrderByDescending(t => t.TruckNumber)
+            .Take(100)
+            .ToListAsync();
+
+        return Ok(list);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{Truckid:guid}/MissingEquipmentData")]
+    public async Task<ActionResult<IEnumerable<TruckEquipmentDto>>> GetMissingEquipmentDataAll(Guid Truckid)
+    {
+        var result = await _db.GateEvents
+            .OrderByDescending(g => g.EventTime)
+            //.Take(100)
+            .SelectMany(g => g.Items.Select(i => new TruckEquipmentDto
+            {
+                GetEventId = g.GateEventId,
+                TruckId = g.TruckId,
+                EquipmentId = i.EquipmentId,
+                EquipmentName = i.Equipment != null ? i.Equipment.Name : null,
+                EventType = g.EventType
+            }))
+            .ToListAsync();
+
+        return Ok(result);
+    }
+
+    [AllowAnonymous]
     [HttpGet("EquipmentAssignments")]
-    public async Task<ActionResult<IEnumerable<TruckEquipmentAssignmentDto>>> GetDataAll()
+    public async Task<ActionResult<IEnumerable<TruckEquipmentAssignment>>> GetDataAll()
     {
         var list = await _db.TruckEquipmentAssignments
+            .Include(a => a.Truck)
+                .ThenInclude(t => t.EquipmentTemplates)
+                    .ThenInclude(tet => tet.EquipmentType)
             .Include(a => a.Truck)
                 .ThenInclude(t => t.Driver)
             .Include(a => a.Equipment)
@@ -216,5 +266,4 @@ public class TrucksController : ControllerBase
 
         return Ok(list);
     }
-
 }

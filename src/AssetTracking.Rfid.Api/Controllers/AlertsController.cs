@@ -1,12 +1,14 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
-using AssetTracking.Rfid.Api.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class AlertsController : ControllerBase
 {
@@ -17,6 +19,7 @@ public class AlertsController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Alert>>> GetAll()
     {
@@ -28,6 +31,7 @@ public class AlertsController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpPost("{id:guid}/resolve")]
     public async Task<ActionResult> Resolve(Guid id)
     {
@@ -42,6 +46,7 @@ public class AlertsController : ControllerBase
         return Ok(alert);
     }
 
+    [AllowAnonymous]
     [HttpGet("rules")]
     public async Task<ActionResult<AlertRules>> GetRules()
     {
@@ -64,6 +69,7 @@ public class AlertsController : ControllerBase
         return Ok(rules);
     }
 
+    [AllowAnonymous]
     [HttpPut("rules")]
     public async Task<ActionResult<AlertRules>> UpdateRules([FromBody] AlertRulesUpdateRequest request)
     {

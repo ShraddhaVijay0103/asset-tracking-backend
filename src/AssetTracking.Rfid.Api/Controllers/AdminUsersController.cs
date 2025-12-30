@@ -2,6 +2,7 @@ using AssetTracking.Rfid.Api;
 using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace SouthernBotanical.Rfid.Api.Controllers;
 
 [ApiController]
-
+[Authorize]
 [Route("api/admin/users")]
 
 public class AdminUsersController : ControllerBase
@@ -25,7 +26,7 @@ public class AdminUsersController : ControllerBase
         _jwtToken = jwtToken;
     }
 
-
+    [AllowAnonymous]
     [HttpGet]
 
     public async Task<ActionResult<IEnumerable<User>>> GetUsers()
@@ -42,6 +43,7 @@ public class AdminUsersController : ControllerBase
 
     }
 
+    [AllowAnonymous]
     [HttpPost]
 
     public async Task<ActionResult<User>> CreateUser([FromBody] CreateUserRequest request)
@@ -82,6 +84,7 @@ public class AdminUsersController : ControllerBase
 
     }
 
+    [AllowAnonymous]
     [HttpPut("{id:guid}/role")]
 
     public async Task<ActionResult<User>> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest request)
@@ -100,6 +103,7 @@ public class AdminUsersController : ControllerBase
 
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {

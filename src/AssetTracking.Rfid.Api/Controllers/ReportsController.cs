@@ -1,11 +1,13 @@
+using AssetTracking.Rfid.Api.Models;
+using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using AssetTracking.Rfid.Infrastructure.Persistence;
-using AssetTracking.Rfid.Api.Models;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/reports")]
 public class ReportsController : ControllerBase
 {
@@ -16,6 +18,7 @@ public class ReportsController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet("missing-equipment")]
     public async Task<ActionResult<IEnumerable<MissingEquipmentReportRow>>> GetMissingEquipment([FromQuery] DateOnly date)
     {
@@ -57,6 +60,7 @@ public class ReportsController : ControllerBase
         return Ok(rows.OrderByDescending(r => r.EventTime));
     }
 
+    [AllowAnonymous]
     [HttpGet("truck-history/{truckId:guid}")]
     public async Task<ActionResult<IEnumerable<TruckHistoryRow>>> GetTruckHistory(Guid truckId)
     {
@@ -76,6 +80,7 @@ public class ReportsController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpGet("reader-health")]
     public async Task<ActionResult<IEnumerable<ReaderHealthRow>>> GetReaderHealth()
     {
@@ -107,6 +112,7 @@ public class ReportsController : ControllerBase
         return Ok(rows);
     }
 
+    [AllowAnonymous]
     [HttpGet("driver-history/{driverId:guid}")]
     public async Task<ActionResult<IEnumerable<TruckHistoryRow>>> GetDriverHistory(Guid driverId)
     {
@@ -127,6 +133,7 @@ public class ReportsController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpGet("equipment-utilization")]
     public async Task<ActionResult> GetEquipmentUtilization([FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
     {
@@ -151,6 +158,7 @@ public class ReportsController : ControllerBase
         return Ok(usage);
     }
 
+    [AllowAnonymous]
     [HttpGet("rfid-analytics")]
     public async Task<ActionResult> GetRfidAnalytics([FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
     {
@@ -171,6 +179,7 @@ public class ReportsController : ControllerBase
         return Ok(byHour);
     }
 
+    [AllowAnonymous]
     [HttpGet("exceptions-resolution")]
     public async Task<ActionResult> GetExceptionsResolution([FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
     {

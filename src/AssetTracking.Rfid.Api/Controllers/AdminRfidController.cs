@@ -1,11 +1,13 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/admin/rfid")]
 public class AdminRfidController : ControllerBase
 {
@@ -22,6 +24,7 @@ public class AdminRfidController : ControllerBase
         public Guid EquipmentId { get; set; }
     }
 
+    [AllowAnonymous]
     [HttpPost("assign")]
     public async Task<ActionResult> AssignTag([FromBody] AssignTagRequest request)
     {
@@ -45,6 +48,7 @@ public class AdminRfidController : ControllerBase
         return Ok(new { equipment.EquipmentId, equipment.Name, TagEpc = tag.Epc });
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<EquipmentType>>> GetAll()
     {

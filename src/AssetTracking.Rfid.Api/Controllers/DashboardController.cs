@@ -1,11 +1,13 @@
+using AssetTracking.Rfid.Api.Models;
+using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using AssetTracking.Rfid.Infrastructure.Persistence;
-using AssetTracking.Rfid.Api.Models;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/dashboard")]
 public class DashboardController : ControllerBase
 {
@@ -16,6 +18,7 @@ public class DashboardController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummary>> GetSummary()
     {
@@ -125,6 +128,7 @@ public class DashboardController : ControllerBase
         return Ok(summary);
     }
 
+    [AllowAnonymous]
     [HttpGet("gate-feed")]
     public async Task<ActionResult> GetGateFeed()
     {

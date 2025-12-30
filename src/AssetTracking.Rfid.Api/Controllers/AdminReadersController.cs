@@ -1,11 +1,13 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/admin/readers")]
 public class AdminReadersController : ControllerBase
 {
@@ -16,6 +18,7 @@ public class AdminReadersController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Reader>>> GetAll()
     {
@@ -23,6 +26,7 @@ public class AdminReadersController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpPost]
     public async Task<ActionResult<Reader>> Create([FromBody] Reader reader)
     {
@@ -34,6 +38,7 @@ public class AdminReadersController : ControllerBase
         return Ok(reader);
     }
 
+    [AllowAnonymous]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<Reader>> Update(Guid id, [FromBody] Reader request)
     {

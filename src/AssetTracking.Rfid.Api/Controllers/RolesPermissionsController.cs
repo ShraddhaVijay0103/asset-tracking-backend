@@ -1,12 +1,15 @@
-using Microsoft.AspNetCore.Mvc;
 using AssetTracking.Rfid.Api.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/admin/roles/permissions")]
 public class RolesPermissionsController : ControllerBase
 {
+    [AllowAnonymous]
     [HttpGet]
     public ActionResult<IEnumerable<RolePermissions>> GetRolePermissions()
     {

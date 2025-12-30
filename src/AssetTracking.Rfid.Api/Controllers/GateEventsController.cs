@@ -1,12 +1,14 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
-using AssetTracking.Rfid.Api.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class GateEventsController : ControllerBase
 {
@@ -17,6 +19,7 @@ public class GateEventsController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<GateEvent>>> GetAll()
     {
@@ -31,6 +34,7 @@ public class GateEventsController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpGet("live")]
     public async Task<ActionResult<IEnumerable<GateEvent>>> GetLive()
     {
@@ -45,6 +49,7 @@ public class GateEventsController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<GateEvent>> GetById(Guid id)
     {
@@ -59,6 +64,7 @@ public class GateEventsController : ControllerBase
         return Ok(gateEvent);
     }
 
+    [AllowAnonymous]
     [HttpPost("{id:guid}/review")]
     public async Task<ActionResult> Review(Guid id, [FromBody] GateEventReviewRequest request)
     {

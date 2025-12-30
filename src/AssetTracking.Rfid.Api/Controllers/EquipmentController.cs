@@ -1,11 +1,13 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class EquipmentController : ControllerBase
 {
@@ -16,6 +18,7 @@ public class EquipmentController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Equipment>>> GetAll()
     {
@@ -27,6 +30,7 @@ public class EquipmentController : ControllerBase
         return Ok(list);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<Equipment>> GetById(Guid id)
     {
@@ -40,6 +44,7 @@ public class EquipmentController : ControllerBase
         return Ok(equipment);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:guid}/history")]
     public async Task<ActionResult> GetHistory(Guid id)
     {
