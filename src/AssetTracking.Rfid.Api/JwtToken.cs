@@ -32,15 +32,13 @@ namespace AssetTracking.Rfid.Api
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-                new Claim(ClaimTypes.Name, user.FullName ?? string.Empty),
-                new Claim(ClaimTypes.Role, roleName ?? "User"),
+                new Claim("UserName", user.FullName ?? string.Empty),
+                new Claim("Role", roleName ?? "User"),
                 new Claim("Site", user.SiteId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
             var token = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
                 claims: claims,
                 expires: DateTime.UtcNow.AddMinutes(
                     double.Parse(jwtSettings["ExpireMinutes"]!)
