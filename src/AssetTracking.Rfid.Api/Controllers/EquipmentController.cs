@@ -1,3 +1,4 @@
+using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -42,6 +43,91 @@ public class EquipmentController : ControllerBase
         if (equipment is null) return NotFound();
 
         return Ok(equipment);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{siteId:guid}/missing-equipment-summary")]
+    public async Task<ActionResult<MissingEquipmentCountsDto>> GetMissingEquipmentSummary(Guid siteId)
+    {
+        var nowUtc = DateTime.UtcNow; // Use UTC
+
+        // Today (UTC)
+        var todayStartUtc = nowUtc.Date;
+        var todayEndUtc = todayStartUtc.AddDays(1);
+
+        // This week (Monday to Sunday, UTC)
+        var diff = (7 + (nowUtc.DayOfWeek - DayOfWeek.Monday)) % 7;
+        var weekStartUtc = todayStartUtc.AddDays(-diff);
+        var weekEndUtc = weekStartUtc.AddDays(7);
+
+        // This month (UTC)
+        var monthStartUtc = new DateTime(nowUtc.Year, nowUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthEndUtc = monthStartUtc.AddMonths(1);
+
+        // Flatten all items with parent OpenedAt
+        var itemsQuery = _db.MissingEquipmentCases
+            .Where(c => c.SiteId == siteId)
+            .SelectMany(c => c.Items, (c, i) => new
+            {
+                Item = i,
+                OpenedAt = c.OpenedAt.UtcDateTime, // Ensure UTC
+                ClosedAt = c.ClosedAt.HasValue ? c.ClosedAt.Value.UtcDateTime : (DateTime?)null,
+                RecoveredAt = i.RecoveredAt.HasValue ? i.RecoveredAt.Value.UtcDateTime : (DateTime?)null
+            });
+
+        // Today missing
+        var todayMissing = await itemsQuery
+            .Where(x => x.ClosedAt == null
+                        && !x.Item.IsRecovered
+                        && x.OpenedAt >= todayStartUtc
+                        && x.OpenedAt < todayEndUtc)
+            .CountAsync();
+
+        // This week missing
+        var thisWeekMissing = await itemsQuery
+            .Where(x => x.ClosedAt == null
+                        && !x.Item.IsRecovered
+                        && x.OpenedAt >= weekStartUtc
+                        && x.OpenedAt < weekEndUtc)
+            .CountAsync();
+
+        // This month missing
+        var thisMonthMissing = await itemsQuery
+            .Where(x => x.ClosedAt == null
+                        && !x.Item.IsRecovered
+                        && x.OpenedAt >= monthStartUtc
+                        && x.OpenedAt < monthEndUtc)
+            .CountAsync();
+
+        // Long overdue (>24h)
+        var longOverdue = await itemsQuery
+            .Where(x => x.ClosedAt == null
+                        && !x.Item.IsRecovered
+                        && (nowUtc - x.OpenedAt).TotalHours > 24)
+            .CountAsync();
+
+        // Recently cleared today
+        var recentlyClearedToday = await itemsQuery
+            .Where(x => x.Item.IsRecovered
+                        && x.RecoveredAt.HasValue
+                        && x.RecoveredAt >= todayStartUtc
+                        && x.RecoveredAt < todayEndUtc)
+            .CountAsync();
+
+        var response = new MissingEquipmentCountsDto
+        {
+            TodayMissing = todayMissing,
+            ThisWeekMissing = thisWeekMissing,
+            ThisMonthMissing = thisMonthMissing,
+            LongOverdue = longOverdue,
+            RecentlyClearedToday = recentlyClearedToday
+        };
+
+        if (todayMissing == 0 && thisWeekMissing == 0 && thisMonthMissing == 0
+            && longOverdue == 0 && recentlyClearedToday == 0)
+            return NotFound();
+
+        return Ok(response);
     }
 
     [AllowAnonymous]
