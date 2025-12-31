@@ -28,52 +28,30 @@ public class AdminUsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet]
-
     public async Task<ActionResult<IEnumerable<User>>> GetUsers()
-
     {
-
         var list = await _db.Users
-
             .Include(u => u.Role)
-
             .ToListAsync();
 
         return Ok(list);
-
     }
 
     [AllowAnonymous]
     [HttpPost]
-
     public async Task<ActionResult<User>> CreateUser([FromBody] CreateUserRequest request)
-
     {
-
         var user = new User
-
         {
-
             UserId = Guid.NewGuid(),
-
             FullName = request.FullName,
-
             UserName = request.UserName,
-
             PhoneNo = request.PhoneNo,
-
             Email = request.Email,
-
             Password = request.Password, // NOTE: ideally you hash it
-
             ConfirmPassword = request.ConfirmPassword,
-
             SiteId = request.SiteId,
-
             RoleId = request.RoleId
-
-
-
         };
 
         _db.Users.Add(user);
@@ -86,11 +64,8 @@ public class AdminUsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpPut("{id:guid}/role")]
-
     public async Task<ActionResult<User>> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest request)
-
     {
-
         var user = await _db.Users.FirstOrDefaultAsync(u => u.UserId == id);
 
         if (user is null) return NotFound();

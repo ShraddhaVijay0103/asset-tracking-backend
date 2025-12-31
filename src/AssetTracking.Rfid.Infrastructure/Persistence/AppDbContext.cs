@@ -30,6 +30,10 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ReaderHeartbeat> ReaderHeartbeats => Set<ReaderHeartbeat>();
     public DbSet<RfidScan> RfidScans => Set<RfidScan>();
+    public DbSet<MissingEquipmentCase> MissingEquipmentCases => Set<MissingEquipmentCase>();
+    public DbSet<MissingEquipmentCaseItem> MissingEquipmentCaseItems => Set<MissingEquipmentCaseItem>();
+    public DbSet<MissingEquipmentSeverity> MissingEquipmentSeverities => Set<MissingEquipmentSeverity>();
+    public DbSet<MissingEquipmentStatus> MissingEquipmentStatuses => Set<MissingEquipmentStatus>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,5 +59,10 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<AuditLog>().HasKey(e => e.AuditLogId);
         modelBuilder.Entity<ReaderHeartbeat>().HasKey(e => e.HeartbeatId);
         modelBuilder.Entity<RfidScan>().HasKey(e => e.ScanId);
+        modelBuilder.Entity<MissingEquipmentCase>().HasKey(e => e.MissingEquipmentCaseId);
+        modelBuilder.Entity<MissingEquipmentCaseItem>().HasKey(e => e.MissingEquipmentCaseItemId);
+        modelBuilder.Entity<MissingEquipmentSeverity>().HasKey(e => e.SeverityId);
+        modelBuilder.Entity<MissingEquipmentStatus>().HasKey(e => e.StatusId);
+
     }
 }
