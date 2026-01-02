@@ -25,6 +25,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAngular", policy =>
     {
         policy
+        .WithOrigins("https://prosperassettracking.com")
             .AllowAnyOrigin()
             .AllowAnyMethod()
             .AllowAnyHeader();

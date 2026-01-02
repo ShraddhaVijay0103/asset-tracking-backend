@@ -82,7 +82,8 @@ public class EquipmentController : ControllerBase
                         Status_Id = mes.StatusId,
                         Status = mes.Code,
                         Severity = mesv.Code,
-                        Opened_At = mec.OpenedAt
+                        Opened_At = mec.OpenedAt,
+                        lastSeen = mec.LastSeenAt
                     };
 
         var result = await query.AsNoTracking().ToListAsync();
@@ -168,7 +169,7 @@ public class EquipmentController : ControllerBase
         var todayEndUtc = todayStartUtc.AddDays(1);
 
         // This week (Monday to Sunday, UTC)
-        var diff = (7 + (nowUtc.DayOfWeek - DayOfWeek.Monday)) % 7;
+        var diff = (7 + (nowUtc.DayOfWeek - DayOfWeek.Monday)) % 7;                                                                                   
         var weekStartUtc = todayStartUtc.AddDays(-diff);
         var weekEndUtc = weekStartUtc.AddDays(7);
 
