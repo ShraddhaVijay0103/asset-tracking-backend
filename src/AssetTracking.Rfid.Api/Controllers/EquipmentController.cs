@@ -1,4 +1,4 @@
-using AssetTracking.Rfid.Api.Models;
+﻿using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -65,19 +65,20 @@ public class EquipmentController : ControllerBase
                     join d in _db.Drivers
                         on mec.DriverId equals d.DriverId into dLeft
                     from d in dLeft.DefaultIfEmpty()
-                    join s in _db.Sites 
+                    join s in _db.Sites
                         on t.SiteId equals s.SiteId into sLeft
                     from s in sLeft.DefaultIfEmpty()
                     where mec.ClosedAt == null
-                          && (t != null && t.SiteId == siteId) 
+                          && (t != null && t.SiteId == siteId)
                     orderby mec.OpenedAt descending
                     select new
                     {
                         mec.MissingEquipmentCaseId,
+                        Equipment_id = e.EquipmentId,
                         Equipment_Name = e.Name,
                         Truck = t != null ? t.TruckNumber : null,
                         Driver = d != null ? d.FullName : null,
-                        Site_Name = s != null ? s.Name : null, 
+                        Site_Name = s != null ? s.Name : null,
                         Status = mes.Code,
                         Severity = mesv.Code,
                         Opened_At = mec.OpenedAt
@@ -86,6 +87,71 @@ public class EquipmentController : ControllerBase
         var result = await query.AsNoTracking().ToListAsync();
 
         return Ok(result);
+    }
+
+    [AllowAnonymous]
+    [HttpPut("{siteId:guid}/missing-equipment-investigation")]
+    public async Task<IActionResult> UpdateMissingEquipmentInvestigation(
+     Guid siteId,
+     [FromBody] CreateInvestigationRequest request)
+    {
+        if (request == null || request.MissingEquipmentCaseId == Guid.Empty)
+            return BadRequest("Invalid request data.");
+
+        // Fetch the case with its items
+        var caseRecord = await _db.MissingEquipmentCases
+            .Include(c => c.Items)
+            .FirstOrDefaultAsync(c => c.MissingEquipmentCaseId == request.MissingEquipmentCaseId
+                                   && c.SiteId == siteId);
+
+        if (caseRecord == null)
+            return NotFound("Missing equipment case not found.");
+
+        // --- Update Notes ---
+        if (!string.IsNullOrEmpty(request.Notes))
+            caseRecord.Notes = request.Notes;
+
+        // --- Update Status from request ---
+        caseRecord.StatusId = request.StatusId;
+
+        // --- Update LastSeenAt automatically ---
+        caseRecord.LastSeenAt = DateTimeOffset.UtcNow;
+
+        // --- Handle automatic status transitions ---
+        switch (request.StatusId)
+        {
+            case 1: // Open
+                    // Nothing to do, remains Open
+                break;
+            case 2: // Investigation
+                    // Move to Investigation
+                caseRecord.StatusId = 2;
+                break;
+            case 3: // Recovered
+                    // Mark all recovered
+                caseRecord.ClosedAt = null; // Not closed yet
+                caseRecord.StatusId = 3;
+                foreach (var item in caseRecord.Items)
+                {
+                    if (!item.IsRecovered)
+                    {
+                        item.IsRecovered = true;
+                        item.RecoveredAt = DateTimeOffset.UtcNow;
+                    }
+                }
+                break;
+            case 4: // Closed
+                    // Close case fully
+                caseRecord.ClosedAt = DateTimeOffset.UtcNow;
+                caseRecord.StatusId = 4;
+                break;
+            default:
+                return BadRequest("Invalid StatusId. Must be 1 (Open), 2 (Investigation), 3 (Recovered), 4 (Closed).");
+        }
+
+        await _db.SaveChangesAsync();
+
+        return Ok(caseRecord);
     }
 
     [AllowAnonymous]

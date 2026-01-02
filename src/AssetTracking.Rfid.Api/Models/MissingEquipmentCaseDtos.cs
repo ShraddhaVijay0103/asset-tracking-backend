@@ -38,6 +38,15 @@ namespace AssetTracking.Rfid.Api.Models
         public int RecentlyClearedToday { get; set; }
     }
 
+    public class CreateInvestigationRequest
+    {
+        public Guid SiteId { get; set; }
+        public Guid MissingEquipmentCaseId { get; set; }
+        public Guid EquipmentId { get; set; }
+        public int StatusId { get; set; } = 1; // Default Open
+        public string? Notes { get; set; }
+    }
+
 
 
 }
