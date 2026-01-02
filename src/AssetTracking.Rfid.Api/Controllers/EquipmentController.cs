@@ -45,6 +45,49 @@ public class EquipmentController : ControllerBase
         return Ok(equipment);
     }
 
+
+    [AllowAnonymous]
+    [HttpGet("{siteId:guid}/missing-equipment")]
+    public async Task<IActionResult> GetMissingEquipmentTable(Guid siteId)
+    {
+        var query = from mec in _db.MissingEquipmentCases
+                    join meci in _db.MissingEquipmentCaseItems
+                        on mec.MissingEquipmentCaseId equals meci.MissingEquipmentCaseId
+                    join e in _db.Equipment
+                        on meci.EquipmentId equals e.EquipmentId
+                    join mes in _db.MissingEquipmentStatuses
+                        on mec.StatusId equals mes.StatusId
+                    join mesv in _db.MissingEquipmentSeverities
+                        on mec.SeverityId equals mesv.SeverityId
+                    join t in _db.Trucks
+                        on mec.TruckId equals t.TruckId into tLeft
+                    from t in tLeft.DefaultIfEmpty()
+                    join d in _db.Drivers
+                        on mec.DriverId equals d.DriverId into dLeft
+                    from d in dLeft.DefaultIfEmpty()
+                    join s in _db.Sites 
+                        on t.SiteId equals s.SiteId into sLeft
+                    from s in sLeft.DefaultIfEmpty()
+                    where mec.ClosedAt == null
+                          && (t != null && t.SiteId == siteId) 
+                    orderby mec.OpenedAt descending
+                    select new
+                    {
+                        mec.MissingEquipmentCaseId,
+                        Equipment_Name = e.Name,
+                        Truck = t != null ? t.TruckNumber : null,
+                        Driver = d != null ? d.FullName : null,
+                        Site_Name = s != null ? s.Name : null, 
+                        Status = mes.Code,
+                        Severity = mesv.Code,
+                        Opened_At = mec.OpenedAt
+                    };
+
+        var result = await query.AsNoTracking().ToListAsync();
+
+        return Ok(result);
+    }
+
     [AllowAnonymous]
     [HttpGet("{siteId:guid}/missing-equipment-summary")]
     public async Task<ActionResult<MissingEquipmentCountsDto>> GetMissingEquipmentSummary(Guid siteId)
