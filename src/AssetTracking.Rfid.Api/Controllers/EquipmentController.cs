@@ -93,45 +93,44 @@ public class EquipmentController : ControllerBase
     [AllowAnonymous]
     [HttpPut("{siteId:guid}/missing-equipment-investigation")]
     public async Task<IActionResult> UpdateMissingEquipmentInvestigation(
-     Guid siteId,
-     [FromBody] CreateInvestigationRequest request)
+      Guid siteId,
+      [FromBody] CreateInvestigationRequest request)
     {
         if (request == null || request.MissingEquipmentCaseId == Guid.Empty)
             return BadRequest("Invalid request data.");
 
-        // Fetch the case with its items
         var caseRecord = await _db.MissingEquipmentCases
             .Include(c => c.Items)
-            .FirstOrDefaultAsync(c => c.MissingEquipmentCaseId == request.MissingEquipmentCaseId
-                                   && c.SiteId == siteId);
+            .FirstOrDefaultAsync(c =>
+                c.MissingEquipmentCaseId == request.MissingEquipmentCaseId &&
+                c.SiteId == siteId);
 
         if (caseRecord == null)
             return NotFound("Missing equipment case not found.");
 
-        // --- Update Notes ---
-        if (!string.IsNullOrEmpty(request.Notes))
-            caseRecord.Notes = request.Notes;
-
-        // --- Update Status from request ---
-        caseRecord.StatusId = request.StatusId;
-
-        // --- Update LastSeenAt automatically ---
+        // Always update last seen
         caseRecord.LastSeenAt = DateTimeOffset.UtcNow;
 
-        // --- Handle automatic status transitions ---
         switch (request.StatusId)
         {
             case 1: // Open
-                    // Nothing to do, remains Open
+                caseRecord.StatusId = 1;
+                if (!string.IsNullOrEmpty(request.Notes))
+                    caseRecord.OpenNotes = request.Notes;
                 break;
+
             case 2: // Investigation
-                    // Move to Investigation
                 caseRecord.StatusId = 2;
+                if (!string.IsNullOrEmpty(request.Notes))
+                    caseRecord.InvestigationNotes = request.Notes;
                 break;
+
             case 3: // Recovered
-                    // Mark all recovered
-                caseRecord.ClosedAt = null; // Not closed yet
                 caseRecord.StatusId = 3;
+                if (!string.IsNullOrEmpty(request.Notes))
+                    caseRecord.RecoveredNotes = request.Notes;
+
+                // Mark all items as recovered
                 foreach (var item in caseRecord.Items)
                 {
                     if (!item.IsRecovered)
@@ -141,19 +140,22 @@ public class EquipmentController : ControllerBase
                     }
                 }
                 break;
+
             case 4: // Closed
-                    // Close case fully
-                caseRecord.ClosedAt = DateTimeOffset.UtcNow;
                 caseRecord.StatusId = 4;
+                caseRecord.ClosedAt = DateTimeOffset.UtcNow;
+                if (!string.IsNullOrEmpty(request.Notes))
+                    caseRecord.ClosedNotes = request.Notes;
                 break;
+
             default:
-                return BadRequest("Invalid StatusId. Must be 1 (Open), 2 (Investigation), 3 (Recovered), 4 (Closed).");
+                return BadRequest("Invalid StatusId. Allowed values: 1, 2, 3, 4.");
         }
 
         await _db.SaveChangesAsync();
-
         return Ok(caseRecord);
     }
+
 
     [AllowAnonymous]
     [HttpGet("{siteId:guid}/missing-equipment-summary")]

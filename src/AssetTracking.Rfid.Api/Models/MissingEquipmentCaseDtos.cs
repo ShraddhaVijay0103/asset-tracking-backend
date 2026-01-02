@@ -43,10 +43,8 @@ namespace AssetTracking.Rfid.Api.Models
         public Guid SiteId { get; set; }
         public Guid MissingEquipmentCaseId { get; set; }
         public Guid EquipmentId { get; set; }
-        public int StatusId { get; set; } = 1; // Default Open
-        public string? Notes { get; set; }
+        public int StatusId { get; set; }   // 1=Open, 2=Investigation, 3=Recovered, 4=Closed
+        public string? Notes { get; set; }  // Status-specific notes
     }
-
-
 
 }

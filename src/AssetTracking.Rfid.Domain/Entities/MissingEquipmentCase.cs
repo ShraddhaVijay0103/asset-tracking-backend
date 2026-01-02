@@ -39,8 +39,17 @@ public class MissingEquipmentCase
     [Column("closed_at")]
     public DateTimeOffset? ClosedAt { get; set; }
 
-    [Column("notes")]
-    public string? Notes { get; set; }
+    [Column("open_notes")]
+    public string? OpenNotes { get; set; }
+
+    [Column("investigation_notes")]
+    public string? InvestigationNotes { get; set; }
+
+    [Column("recovered_notes")]
+    public string? RecoveredNotes { get; set; }
+
+    [Column("closed_notes")]
+    public string? ClosedNotes { get; set; }
 
     public ICollection<MissingEquipmentCaseItem> Items { get; set; }
         = new List<MissingEquipmentCaseItem>();
