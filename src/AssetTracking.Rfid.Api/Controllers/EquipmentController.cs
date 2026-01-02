@@ -74,11 +74,12 @@ public class EquipmentController : ControllerBase
                     select new
                     {
                         mec.MissingEquipmentCaseId,
-                        Equipment_id = e.EquipmentId,
+                        Equipment_Id = e.EquipmentId,
                         Equipment_Name = e.Name,
                         Truck = t != null ? t.TruckNumber : null,
                         Driver = d != null ? d.FullName : null,
                         Site_Name = s != null ? s.Name : null,
+                        Status_Id = mes.StatusId,
                         Status = mes.Code,
                         Severity = mesv.Code,
                         Opened_At = mec.OpenedAt
