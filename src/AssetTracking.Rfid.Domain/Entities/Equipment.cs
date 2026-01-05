@@ -4,6 +4,7 @@ namespace AssetTracking.Rfid.Domain.Entities;
 [Table("equipment", Schema = "public")]
 public class Equipment
 {
+
     [Column("equipment_id")]
     public Guid EquipmentId { get; set; }
     [Column("name")]
@@ -14,6 +15,8 @@ public class Equipment
     [Column("rfid_tag_id")]
     public Guid RfidTagId { get; set; }
     public RfidTag? RfidTag { get; set; }
+    [Column("cost")]
+    public decimal cost { get; set; }
 
     public ICollection<GateEventItem> GateEventItems { get; set; } = new List<GateEventItem>();
 }
