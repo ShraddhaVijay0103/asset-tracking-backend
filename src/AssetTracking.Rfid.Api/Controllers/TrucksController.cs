@@ -277,16 +277,20 @@ public class TrucksController : ControllerBase
                 {
                     var item = i < assigned.Count ? assigned[i] : null;
 
+                    // 🚫 Skip NOT ASSIGNED rows entirely
+                    if (item == null)
+                        continue;
+
                     checkoutTable.Add(new
                     {
-                        Equipment = item?.Equipment?.Name
-                            ?? $"{template.EquipmentType.Name} - Not Assigned",
+                        Equipment = item.Equipment.Name,
                         Required = 1,
-                        Detected = item != null ? "✓" : "-",
-                        EquipmentId = item?.EquipmentId
+                        Detected = "✓",
+                        EquipmentId = item.EquipmentId
                     });
                 }
             }
+
 
             // =========================
             // CHECK-IN (MISSING STATUS)

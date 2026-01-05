@@ -16,7 +16,7 @@ public class Equipment
     public Guid RfidTagId { get; set; }
     public RfidTag? RfidTag { get; set; }
     [Column("cost")]
-    public decimal cost { get; set; }
+    public double cost { get; set; }
 
     public ICollection<GateEventItem> GateEventItems { get; set; } = new List<GateEventItem>();
 }
