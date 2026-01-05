@@ -16,3 +16,15 @@ public class UpdateUserRoleRequest
 {
     public Guid RoleId { get; set; }
 }
+
+public class UpdateUserRequest
+{
+    public string FullName { get; set; }
+    public string UserName { get; set; }
+    public string PhoneNo { get; set; }
+    public string Email { get; set; }
+    public string Password { get; set; }
+    public string ConfirmPassword { get; set; }
+    public Guid SiteId { get; set; }
+    public Guid RoleId { get; set; }
+}
