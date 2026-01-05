@@ -428,12 +428,12 @@ public class ScanDataProcessorFunction
         if (string.Equals(eventType, "Exit", StringComparison.OrdinalIgnoreCase))
         {
             // ---------- Status IDs ----------
-            var closedStatusId = await _db.MissingEquipmentStatus
+            var closedStatusId = await _db.MissingEquipmentStatuses
                 .Where(s => s.Code == "Closed")
                 .Select(s => s.StatusId)
                 .SingleAsync();
 
-            var openStatusId = await _db.MissingEquipmentStatus
+            var openStatusId = await _db.MissingEquipmentStatuses
                 .Where(s => s.Code == "Open")
                 .Select(s => s.StatusId)
                 .SingleAsync();
@@ -469,10 +469,10 @@ public class ScanDataProcessorFunction
             var totalMissingCost = missingEquipmentCosts.Sum(x => x.Cost);
 
             // ---------- Resolve severity ----------
-            var severities = await _db.MissingEquipmentSeverity
+            var severities = await _db.MissingEquipmentSeverities 
       .Select(s => new
       {
-          s.severityId,
+          s.SeverityId,
           s.Cost // range string
       })
       .ToListAsync();
@@ -483,7 +483,7 @@ public class ScanDataProcessorFunction
                     var range = ParseCostRange(s.Cost);
                     return new
                     {
-                        s.severityId,
+                        s.SeverityId,
                         range.Min,
                         range.Max
                     };
@@ -499,7 +499,7 @@ public class ScanDataProcessorFunction
                 throw new Exception($"No severity found for cost {totalMissingCost}");
             }
 
-            var severityId = matchedSeverity.severityId;
+            var severityId = matchedSeverity.SeverityId;
 
             // ---------- Create or update case ----------
             if (existingCase == null)
@@ -513,7 +513,7 @@ public class ScanDataProcessorFunction
                     OpenedAt = now,
                     LastSeenAt = now,
                     StatusId = openStatusId,
-                    Severity = (MissingEquipmentSeverity)matchedSeverity.severityId,
+                    SeverityId = matchedSeverity.SeverityId,
                     Items = new List<MissingEquipmentCaseItem>()
                 };
 
@@ -522,7 +522,7 @@ public class ScanDataProcessorFunction
             else
             {
                 existingCase.LastSeenAt = now;
-                existingCase.Severity = (MissingEquipmentSeverity?)matchedSeverity.severityId;
+                existingCase.SeverityId = matchedSeverity.SeverityId;
             }
 
             foreach (var epc in missingEpcs)
@@ -611,22 +611,22 @@ public class ScanDataProcessorFunction
 
     private async Task HandleMissingEquipmentAsync(Truck truck, Reader? reader, GateEvent gateEvent, HashSet<string> stillMissingEpcs, HashSet<string> scannedEpcs, DateTime now)
     {
-        var closedStatusId = await _db.MissingEquipmentStatus
+        var closedStatusId = await _db.MissingEquipmentStatuses
              .Where(s => s.Code == "Closed")
              .Select(s => s.StatusId)
              .SingleAsync();
 
-        var openStatusId = await _db.MissingEquipmentStatus
+        var openStatusId = await _db.MissingEquipmentStatuses
             .Where(s => s.Code == "Open")
             .Select(s => s.StatusId)
             .SingleAsync();
 
-        var recoveredStatusId = await _db.MissingEquipmentStatus
+        var recoveredStatusId = await _db.MissingEquipmentStatuses
            .Where(s => s.Code == "Recovered")
            .Select(s => s.StatusId)
            .SingleAsync();
 
-        var investigationStatusId = await _db.MissingEquipmentStatus
+        var investigationStatusId = await _db.MissingEquipmentStatuses
            .Where(s => s.Code == "Investigation")
            .Select(s => s.StatusId)
            .SingleAsync();
@@ -660,10 +660,10 @@ public class ScanDataProcessorFunction
         var totalMissingCost = missingEquipmentCosts.Sum(x => x.Cost);
 
         // ---------- Resolve severity ----------
-        var severities = await _db.MissingEquipmentSeverity
+        var severities = await _db.MissingEquipmentSeverities
   .Select(s => new
   {
-      s.severityId,
+      s.SeverityId,
       s.Cost // range string
   })
   .ToListAsync();
@@ -674,7 +674,7 @@ public class ScanDataProcessorFunction
                 var range = ParseCostRange(s.Cost);
                 return new
                 {
-                    s.severityId,
+                    s.SeverityId,
                     range.Min,
                     range.Max
                 };
@@ -690,7 +690,7 @@ public class ScanDataProcessorFunction
             throw new Exception($"No severity found for cost {totalMissingCost}");
         }
 
-        var severityId = matchedSeverity.severityId;
+        var severityId = matchedSeverity.SeverityId;
         // 4️⃣ Create case if NOT exists
         if (existingCase == null) { 
             existingCase = new MissingEquipmentCase 
@@ -700,7 +700,7 @@ public class ScanDataProcessorFunction
                 DriverId = truck.DriverId, 
                 SiteId = reader?.SiteId ?? Guid.Empty,
                 StatusId = openStatusId,
-                Severity = (MissingEquipmentSeverity)matchedSeverity.severityId,
+                SeverityId = matchedSeverity.SeverityId,
                 OpenedAt = now,
                 LastSeenAt = now 
             }; 
