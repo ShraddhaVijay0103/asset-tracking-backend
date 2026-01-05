@@ -47,4 +47,10 @@ namespace AssetTracking.Rfid.Api.Models
         public string? Notes { get; set; }  // Status-specific notes
     }
 
+    public class QuickAlertsDto
+    {
+        public int HighSeverityCount { get; set; }   // > 24 hours
+        public int AgingCasesCount { get; set; }     // > 7 days
+    }
+
 }

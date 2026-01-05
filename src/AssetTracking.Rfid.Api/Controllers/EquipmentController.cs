@@ -157,7 +157,6 @@ public class EquipmentController : ControllerBase
         return Ok(caseRecord);
     }
 
-
     [AllowAnonymous]
     [HttpGet("{siteId:guid}/missing-equipment-summary")]
     public async Task<ActionResult<MissingEquipmentCountsDto>> GetMissingEquipmentSummary(Guid siteId)
@@ -169,7 +168,7 @@ public class EquipmentController : ControllerBase
         var todayEndUtc = todayStartUtc.AddDays(1);
 
         // This week (Monday to Sunday, UTC)
-        var diff = (7 + (nowUtc.DayOfWeek - DayOfWeek.Monday)) % 7;                                                                                   
+        var diff = (7 + (nowUtc.DayOfWeek - DayOfWeek.Monday)) % 7;
         var weekStartUtc = todayStartUtc.AddDays(-diff);
         var weekEndUtc = weekStartUtc.AddDays(7);
 
@@ -241,6 +240,37 @@ public class EquipmentController : ControllerBase
             return NotFound();
 
         return Ok(response);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{siteId:guid}/quick-alerts")]
+    public async Task<IActionResult> GetQuickAlerts(Guid siteId)
+    {
+        var nowUtc = DateTime.UtcNow;
+
+        var itemsQuery = _db.MissingEquipmentCases
+            .Where(c => c.SiteId == siteId && c.ClosedAt == null)
+            .SelectMany(c => c.Items, (c, i) => new
+            {
+                OpenedAt = c.OpenedAt.UtcDateTime,
+                RecoveredAt = i.RecoveredAt,
+                SeverityId = c.SeverityId
+            })
+            .Where(x => x.RecoveredAt == null && x.SeverityId >= 3); 
+
+        var criticalSeverityCount = await itemsQuery
+            .Where(x => x.SeverityId > 3)
+            .CountAsync();
+
+        var agingCasesCount = await itemsQuery
+            .Where(x => (nowUtc - x.OpenedAt).TotalDays > 7)
+            .CountAsync();
+
+        return Ok(new
+        {
+            SeverityCount = criticalSeverityCount,
+            AgingCasesCount = agingCasesCount
+        });
     }
 
     [AllowAnonymous]
