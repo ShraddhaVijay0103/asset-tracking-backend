@@ -1,4 +1,4 @@
-using AssetTracking.Rfid.Api;
+﻿using AssetTracking.Rfid.Api;
 using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace SouthernBotanical.Rfid.Api.Controllers;
 
@@ -28,19 +29,65 @@ public class AdminUsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+    public async Task<IActionResult> GetUsers()
     {
-        var list = await _db.Users
+        var users = await _db.Users
             .Include(u => u.Role)
+            .Include(u => u.Site)
             .ToListAsync();
 
-        return Ok(list);
+        var result = users.Select(u => new
+        {
+            u.UserId,
+            u.FullName,
+            u.UserName,
+            u.PhoneNo,
+            u.Email,
+            u.Password,
+            u.ConfirmPassword,
+            u.Site.SiteId,
+            u.Site.Name,
+            u.Role.RoleId,
+            RoleName = u.Role.Name
+
+        });
+
+        return Ok(result);
     }
 
+
     [AllowAnonymous]
-    [HttpPost]
-    public async Task<ActionResult<User>> CreateUser([FromBody] CreateUserRequest request)
+    [HttpPost("{siteId}")]
+    public async Task<ActionResult<User>> CreateUser(Guid siteId, [FromBody] CreateUserRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.FullName))
+            return BadRequest("FullName is required.");
+
+        if (string.IsNullOrWhiteSpace(request.UserName))
+            return BadRequest("UserName is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Email) || !new EmailAddressAttribute().IsValid(request.Email))
+            return BadRequest("Valid Email is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest("Password is required.");
+
+        if (request.Password != request.ConfirmPassword)
+            return BadRequest("Password and ConfirmPassword do not match.");
+
+        bool emailExists = await _db.Users.AnyAsync(u => u.Email == request.Email);
+        if (emailExists)
+            return BadRequest("Email already exists.");
+
+        var roleExists = await _db.Roles.AnyAsync(r => r.RoleId == request.RoleId);
+        if (!roleExists)
+            return BadRequest("Invalid RoleId.");
+
+        var siteExists = await _db.Sites.AnyAsync(s => s.SiteId == siteId);
+        if (!siteExists)
+            return BadRequest("Invalid SiteId.");
+
+
         var user = new User
         {
             UserId = Guid.NewGuid(),
@@ -48,18 +95,99 @@ public class AdminUsersController : ControllerBase
             UserName = request.UserName,
             PhoneNo = request.PhoneNo,
             Email = request.Email,
-            Password = request.Password, // NOTE: ideally you hash it
-            ConfirmPassword = request.ConfirmPassword,
-            SiteId = request.SiteId,
+            Password = HashPassword(request.Password),
+            SiteId = siteId,
             RoleId = request.RoleId
         };
 
         _db.Users.Add(user);
-
         await _db.SaveChangesAsync();
 
-        return Ok(user);
+        return Ok(new
+        {
+            user.UserId,
+            user.FullName,
+            user.UserName,
+            user.PhoneNo,
+            user.Email,
+            user.SiteId,
+            user.RoleId
+        });
+    }
 
+    [AllowAnonymous]
+    [HttpPut("{userId}/{siteId}")]
+    public async Task<ActionResult<User>> UpdateUser(Guid userId, Guid siteId, [FromBody] UpdateUserRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.FullName))
+            return BadRequest("FullName is required.");
+
+        if (string.IsNullOrWhiteSpace(request.UserName))
+            return BadRequest("UserName is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Email) || !new EmailAddressAttribute().IsValid(request.Email))
+            return BadRequest("Valid Email is required.");
+
+        if (!string.IsNullOrWhiteSpace(request.Password) && request.Password != request.ConfirmPassword)
+            return BadRequest("Password and ConfirmPassword do not match.");
+
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null)
+            return NotFound("User not found.");
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            bool emailExists = await _db.Users
+                .AnyAsync(u => u.Email == request.Email && u.UserId != userId);
+
+            if (emailExists)
+                return BadRequest("Email already exists.");
+        }
+
+        var roleExists = await _db.Roles.AnyAsync(r => r.RoleId == request.RoleId);
+        if (!roleExists)
+            return BadRequest("Invalid RoleId.");
+
+        var siteExists = await _db.Sites.AnyAsync(s => s.SiteId == siteId);
+        if (!siteExists)
+            return BadRequest("Invalid SiteId.");
+
+
+        user.FullName = request.FullName;
+        user.UserName = request.UserName;
+        user.PhoneNo = request.PhoneNo;
+        user.Email = request.Email;
+        user.SiteId = siteId;
+        user.RoleId = request.RoleId;
+
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            user.Password = HashPassword(request.Password);
+        }
+
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            user.UserId,
+            user.FullName,
+            user.UserName,
+            user.PhoneNo,
+            user.Email,
+            user.SiteId,
+            user.RoleId
+        });
+    }
+
+    private string HashPassword(string password)
+    {
+        using (var sha256 = System.Security.Cryptography.SHA256.Create())
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(password);
+            var hash = sha256.ComputeHash(bytes);
+            return Convert.ToBase64String(hash);
+        }
     }
 
     [AllowAnonymous]

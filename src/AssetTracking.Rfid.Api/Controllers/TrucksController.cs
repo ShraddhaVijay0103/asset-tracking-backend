@@ -228,42 +228,126 @@ public class TrucksController : ControllerBase
 
         return Ok(list);
     }
-
     [AllowAnonymous]
-    [HttpGet("{Truckid:guid}/MissingEquipmentData")]
-    public async Task<ActionResult<IEnumerable<TruckEquipmentDto>>> GetMissingEquipmentDataAll(Guid Truckid)
+    [HttpGet("site/{siteId:guid}/checkout-in-status")]
+    public async Task<IActionResult> GetCheckoutInStatusBySite(Guid siteId)
     {
-        var result = await _db.GateEvents
-            .OrderByDescending(g => g.EventTime)
-            //.Take(100)
-            .SelectMany(g => g.Items.Select(i => new TruckEquipmentDto
+        var trucks = await _db.Trucks
+            .Where(t => t.SiteId == siteId)
+            .Include(t => t.Driver)
+            .ToListAsync();
+
+        if (!trucks.Any())
+            return NotFound();
+
+        var results = new List<object>();
+
+        foreach (var truck in trucks)
+        {
+            var truckId = truck.TruckId;
+
+            // =========================
+            // ACTIVE ASSIGNMENTS (CHECK-OUT)
+            // =========================
+            var activeAssignments = await _db.TruckEquipmentAssignments
+                .Where(a => a.TruckId == truckId && a.ReturnedAt == null)
+                .Include(a => a.Equipment)
+                .ToListAsync();
+
+            // =========================
+            // REQUIRED TEMPLATES
+            // =========================
+            var templates = await _db.TruckEquipmentTemplates
+                .Where(t => t.TruckId == truckId)
+                .Include(t => t.EquipmentType)
+                .ToListAsync();
+
+            // =========================
+            // CHECK-OUT TABLE
+            // =========================
+            var checkoutTable = new List<object>();
+
+            foreach (var template in templates)
             {
-                GetEventId = g.GateEventId,
-                TruckId = g.TruckId,
-                EquipmentId = i.EquipmentId,
-                EquipmentName = i.Equipment != null ? i.Equipment.Name : null,
-                EventType = g.EventType
-            }))
-            .ToListAsync();
+                var assigned = activeAssignments
+                    .Where(a => a.Equipment.EquipmentTypeId == template.EquipmentTypeId)
+                    .ToList();
 
-        return Ok(result);
+                for (int i = 0; i < template.RequiredCount; i++)
+                {
+                    var item = i < assigned.Count ? assigned[i] : null;
+
+                    checkoutTable.Add(new
+                    {
+                        Equipment = item?.Equipment?.Name
+                            ?? $"{template.EquipmentType.Name} - Not Assigned",
+                        Required = 1,
+                        Detected = item != null ? "✓" : "-",
+                        EquipmentId = item?.EquipmentId
+                    });
+                }
+            }
+
+            // =========================
+            // CHECK-IN (MISSING STATUS)
+            // SOURCE OF TRUTH:
+            // missing_equipment_case_items.recovered_at IS NULL
+            // =========================
+            var missingItems = await _db.MissingEquipmentCases
+                .Where(c =>
+                    c.SiteId == siteId &&
+                    c.TruckId == truckId &&
+                    c.ClosedAt == null)
+                .SelectMany(c => c.Items)
+                .Where(i => i.RecoveredAt == null)
+                .Include(i => i.Equipment)
+                .ToListAsync();
+
+            var checkinTable = missingItems.Select(i => new
+            {
+                Equipment = i.Equipment.Name,
+                GateStatus = "MISSING",
+                EquipmentId = i.EquipmentId
+            }).ToList();
+
+            results.Add(new
+            {
+                Truck = new
+                {
+                    truck.TruckId,
+                    truck.TruckNumber,
+                    Driver = truck.Driver?.FullName
+                },
+                CheckOut = new
+                {
+                    Table = checkoutTable,
+                    Summary = new
+                    {
+                        TotalRequired = templates.Sum(t => t.RequiredCount),
+                        TotalAssigned = activeAssignments.Count
+                    }
+                },
+                CheckIn = new
+                {
+                    LastCheckinTime = (DateTime?)null,
+                    Table = checkinTable,
+                    Summary = new
+                    {
+                        TotalExpected = missingItems.Count,
+                        TotalDetected = 0,
+                        MissingCount = missingItems.Count
+                    }
+                }
+            });
+        }
+
+        return Ok(new
+        {
+            SiteId = siteId,
+            TotalTrucks = results.Count,
+            Trucks = results
+        });
     }
 
-    [AllowAnonymous]
-    [HttpGet("EquipmentAssignments")]
-    public async Task<ActionResult<IEnumerable<TruckEquipmentAssignment>>> GetDataAll()
-    {
-        var list = await _db.TruckEquipmentAssignments
-            .Include(a => a.Truck)
-                .ThenInclude(t => t.EquipmentTemplates)
-                    .ThenInclude(tet => tet.EquipmentType)
-            .Include(a => a.Truck)
-                .ThenInclude(t => t.Driver)
-            .Include(a => a.Equipment)
-            .OrderByDescending(a => a.AssignmentId)
-            .Take(100)
-            .ToListAsync();
 
-        return Ok(list);
-    }
 }
