@@ -6,6 +6,7 @@ namespace AssetTracking.Rfid.Domain.Entities;
 [Table("missing_equipment_severity")]
 public class MissingEquipmentSeverity
 {
+
     [Key]
     [Column("severity_id")]
     public int SeverityId { get; set; }

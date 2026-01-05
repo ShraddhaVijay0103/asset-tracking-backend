@@ -263,6 +263,54 @@ public class ScanDataProcessorFunction
     /// - Exit (Check-Out): compare against expected template (kit) and raise missing alerts
     /// - Entry (Check-In): compare with last Exit to detect items not returned
     /// </summary>
+    private static (decimal Min, decimal? Max) ParseCostRange(string costRange)
+    {
+        costRange = costRange.Replace("$", "").Trim();
+
+        // Example: "2001+"
+        if (costRange.EndsWith("+"))
+        {
+            var min = decimal.Parse(costRange.Replace("+", ""));
+            return (min, null);
+        }
+
+        // Example: "1-100"
+        var parts = costRange.Split('-');
+        return (
+            decimal.Parse(parts[0]),
+            decimal.Parse(parts[1])
+        );
+    }
+    private static decimal ParseCost(string cost)
+    {
+        if (string.IsNullOrWhiteSpace(cost))
+            return 0;
+
+        cost = cost.Replace("$", "")
+                   .Replace(",", "")
+                   .Trim();
+
+        return decimal.TryParse(cost, out var value) ? value : 0;
+    }
+    private async Task<HashSet<string>> GetExpectedEpcsAsync(Guid truckId)
+    {
+        var rows = await (
+            from t in _db.TruckEquipmentTemplates
+            join e in _db.Equipment
+                on t.EquipmentTypeId equals e.EquipmentTypeId
+            where t.TruckId == truckId
+                  && e.RfidTag != null
+            select new
+            {
+                e.RfidTag!.Epc,
+                t.RequiredCount
+            }
+        ).ToListAsync();
+
+        return rows
+            .SelectMany(x => Enumerable.Repeat(x.Epc, x.RequiredCount))
+            .ToHashSet();
+    }
 
     private async Task<GateEvent?> ProcessSessionAsync(
      ScanSession session,
@@ -379,34 +427,121 @@ public class ScanDataProcessorFunction
         // 5) Exit (Check-Out) logic – detect incomplete kits at morning departure
         if (string.Equals(eventType, "Exit", StringComparison.OrdinalIgnoreCase))
         {
-            var truckTemplates = templates.Where(t => t.TruckId == truck.TruckId).ToList();
-            var expectedCount = truckTemplates.Sum(t => t.RequiredCount);
-            var scannedCount = scannedEquipment.Count;
+            // ---------- Status IDs ----------
+            var closedStatusId = await _db.MissingEquipmentStatus
+                .Where(s => s.Code == "Closed")
+                .Select(s => s.StatusId)
+                .SingleAsync();
 
-            if (expectedCount > scannedCount &&
-                (expectedCount - scannedCount) >= alertRules.MissingItemThreshold)
-            {
-                var missingCount = expectedCount - scannedCount;
+            var openStatusId = await _db.MissingEquipmentStatus
+                .Where(s => s.Code == "Open")
+                .Select(s => s.StatusId)
+                .SingleAsync();
 
-                var alert = new Alert
+            // ---------- Existing open case ----------
+            var existingCase = await _db.MissingEquipmentCases
+                .Include(c => c.Items)
+                .FirstOrDefaultAsync(c =>
+                    c.TruckId == truck.TruckId &&
+                    c.StatusId != closedStatusId);
+
+            // ---------- Expected vs scanned ----------
+            var expectedEpcs = await GetExpectedEpcsAsync(truck.TruckId);
+
+            var missingEpcs = expectedEpcs
+                .Except(scannedEpcSet)
+                .ToHashSet();
+
+            if (!missingEpcs.Any())
+                return gateEvent;
+
+            // ---------- Load missing equipment cost ----------
+            var missingEquipmentCosts = await _db.Equipment
+                .Include(e => e.RfidTag)
+                .Where(e => e.RfidTag != null && missingEpcs.Contains(e.RfidTag.Epc))
+                .Select(e => new
                 {
-                    AlertId = Guid.NewGuid(),
-                    Timestamp = now,
-                    Message =
-                        $"{missingCount} equipment items missing for truck {truck.TruckNumber} during CHECK-OUT at reader {reader?.Name}. Truck driver: {truck.Driver?.FullName ?? "(unassigned)"}.",
-                    Severity = "High",
-                    Source = "GateEvent",
-                    IsResolved = false
-                };
-                _db.Alerts.Add(alert);
+                    e.RfidTag!.Epc,
+                    Cost = e.cost
+                })
+                .ToListAsync();
 
-                _logger.LogWarning(
-                    "Exit event: truck {Truck}, driver {Driver}, missing {MissingCount} item(s).",
-                    truck.TruckNumber,
-                    truck.Driver?.FullName,
-                    missingCount);
+            var totalMissingCost = missingEquipmentCosts.Sum(x => x.Cost);
+
+            // ---------- Resolve severity ----------
+            var severities = await _db.MissingEquipmentSeverity
+      .Select(s => new
+      {
+          s.severityId,
+          s.Cost // range string
+      })
+      .ToListAsync();
+
+            var matchedSeverity = severities
+                .Select(s =>
+                {
+                    var range = ParseCostRange(s.Cost);
+                    return new
+                    {
+                        s.severityId,
+                        range.Min,
+                        range.Max
+                    };
+                })
+                .Where(r =>
+                    totalMissingCost >= r.Min &&
+                    (r.Max == null || totalMissingCost <= r.Max))
+                .OrderByDescending(r => r.Min)
+                .FirstOrDefault();
+
+            if (matchedSeverity == null)
+            {
+                throw new Exception($"No severity found for cost {totalMissingCost}");
             }
+
+            var severityId = matchedSeverity.severityId;
+
+            // ---------- Create or update case ----------
+            if (existingCase == null)
+            {
+                existingCase = new MissingEquipmentCase
+                {
+                    MissingEquipmentCaseId = Guid.NewGuid(),
+                    TruckId = truck.TruckId,
+                    DriverId = truck.DriverId,
+                    SiteId = reader.SiteId,
+                    OpenedAt = now,
+                    LastSeenAt = now,
+                    StatusId = openStatusId,
+                    Severity = (MissingEquipmentSeverity)matchedSeverity.severityId,
+                    Items = new List<MissingEquipmentCaseItem>()
+                };
+
+                _db.MissingEquipmentCases.Add(existingCase);
+            }
+            else
+            {
+                existingCase.LastSeenAt = now;
+                existingCase.Severity = (MissingEquipmentSeverity?)matchedSeverity.severityId;
+            }
+
+            foreach (var epc in missingEpcs)
+            {
+                if (!existingCase.Items.Any(i => i.Epc == epc))
+                {
+                    existingCase.Items.Add(new MissingEquipmentCaseItem
+                    {
+                        MissingEquipmentCaseItemId = Guid.NewGuid(),
+                        MissingEquipmentCaseId = existingCase.MissingEquipmentCaseId,
+                        Epc = epc,
+                        IsRecovered = false
+                    });
+                }
+            }
+
+            return gateEvent;
         }
+
         // 6) Entry (Check-In) logic – compare with last Exit to find items not returned
         else if (string.Equals(eventType, "Entry", StringComparison.OrdinalIgnoreCase))
         {
@@ -457,6 +592,8 @@ public class ScanDataProcessorFunction
                         missingEquipNames.Count,
                         missingList);
                 }
+                await HandleMissingEquipmentAsync(truck, reader, gateEvent, stillMissingEpcs.ToHashSet(), scannedEpcSet, now);
+
                 return gateEvent;
             }
             else
@@ -470,6 +607,134 @@ public class ScanDataProcessorFunction
 
         // ✅ REQUIRED: covers Exit path and future event types
         return gateEvent;
+    }
+
+    private async Task HandleMissingEquipmentAsync(Truck truck, Reader? reader, GateEvent gateEvent, HashSet<string> stillMissingEpcs, HashSet<string> scannedEpcs, DateTime now)
+    {
+        var closedStatusId = await _db.MissingEquipmentStatus
+             .Where(s => s.Code == "Closed")
+             .Select(s => s.StatusId)
+             .SingleAsync();
+
+        var openStatusId = await _db.MissingEquipmentStatus
+            .Where(s => s.Code == "Open")
+            .Select(s => s.StatusId)
+            .SingleAsync();
+
+        var recoveredStatusId = await _db.MissingEquipmentStatus
+           .Where(s => s.Code == "Recovered")
+           .Select(s => s.StatusId)
+           .SingleAsync();
+
+        var investigationStatusId = await _db.MissingEquipmentStatus
+           .Where(s => s.Code == "Investigation")
+           .Select(s => s.StatusId)
+           .SingleAsync();
+
+        // 1️⃣ Load existing open case (ONE per truck)
+        var existingCase = await _db.MissingEquipmentCases 
+            .Include(c => c.Items) 
+            .FirstOrDefaultAsync(c => c.TruckId == truck.TruckId && c.StatusId != closedStatusId); 
+        // 2️⃣ AUTO-RECOVER items that reappear
+        if (existingCase != null) {
+            foreach (var item in existingCase.Items 
+                .Where(i => !i.IsRecovered && scannedEpcs.Contains(i.Epc))) {
+                item.IsRecovered = true; item.RecoveredAt = now; } } 
+        // 3️⃣ If NOTHING missing → close case
+        if (!stillMissingEpcs.Any()) { if (existingCase != null) { 
+                if (existingCase.Items.All(i => i.IsRecovered)) { 
+                    existingCase.StatusId = closedStatusId; existingCase.ClosedAt = now; }
+                else { existingCase.StatusId = recoveredStatusId; } existingCase.LastSeenAt = now; }
+            await _db.SaveChangesAsync();
+            return; }
+        var missingEquipmentCosts = await _db.Equipment
+               .Include(e => e.RfidTag)
+               .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
+               .Select(e => new
+               {
+                   e.RfidTag!.Epc,
+                   Cost = e.cost
+               })
+               .ToListAsync();
+
+        var totalMissingCost = missingEquipmentCosts.Sum(x => x.Cost);
+
+        // ---------- Resolve severity ----------
+        var severities = await _db.MissingEquipmentSeverity
+  .Select(s => new
+  {
+      s.severityId,
+      s.Cost // range string
+  })
+  .ToListAsync();
+
+        var matchedSeverity = severities
+            .Select(s =>
+            {
+                var range = ParseCostRange(s.Cost);
+                return new
+                {
+                    s.severityId,
+                    range.Min,
+                    range.Max
+                };
+            })
+            .Where(r =>
+                totalMissingCost >= r.Min &&
+                (r.Max == null || totalMissingCost <= r.Max))
+            .OrderByDescending(r => r.Min)
+            .FirstOrDefault();
+
+        if (matchedSeverity == null)
+        {
+            throw new Exception($"No severity found for cost {totalMissingCost}");
+        }
+
+        var severityId = matchedSeverity.severityId;
+        // 4️⃣ Create case if NOT exists
+        if (existingCase == null) { 
+            existingCase = new MissingEquipmentCase 
+            {
+                MissingEquipmentCaseId = Guid.NewGuid(),
+                TruckId = truck.TruckId,
+                DriverId = truck.DriverId, 
+                SiteId = reader?.SiteId ?? Guid.Empty,
+                StatusId = openStatusId,
+                Severity = (MissingEquipmentSeverity)matchedSeverity.severityId,
+                OpenedAt = now,
+                LastSeenAt = now 
+            }; 
+            _db.MissingEquipmentCases.Add(existingCase); } else { 
+            // Escalate state
+            existingCase.StatusId = investigationStatusId; existingCase.LastSeenAt = now; } 
+        // 5️⃣ Load missing equipment
+        var missingEquipments = await _db.Equipment 
+            .Include(e => e.RfidTag) 
+            .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc)) 
+            .ToListAsync(); 
+        // 6️⃣ Add MissingEquipmentCaseItems (NO DUPLICATES)
+        foreach (var eq in missingEquipments) { 
+            if (!existingCase.Items.Any(i => i.Epc == eq.RfidTag!.Epc)) { 
+                existingCase.Items.Add(new MissingEquipmentCaseItem 
+                { MissingEquipmentCaseItemId = Guid.NewGuid(),
+                    MissingEquipmentCaseId = existingCase.MissingEquipmentCaseId,
+                    EquipmentId = eq.EquipmentId,
+                    Epc = eq.RfidTag!.Epc,
+                    IsRecovered = false }); } } 
+        // 7️⃣ Emit ALERT only ONCE
+        var alertExists = await _db.Alerts
+            .AnyAsync(a => a.Source == "MissingEquipment" && a.Message
+            .Contains(existingCase.MissingEquipmentCaseId.ToString()));
+        if (!alertExists) { 
+            var names = string.Join(", ", missingEquipments.Select(e => e.Name)); 
+            _db.Alerts.Add(new Alert { 
+                AlertId = Guid.NewGuid(),
+                Timestamp = now, 
+                Severity = "High",
+                Source = "MissingEquipment",
+                Message = $"Case {existingCase.MissingEquipmentCaseId}: Truck {truck.TruckNumber} missing items: {names}",
+                IsResolved = false }); 
+        } await _db.SaveChangesAsync();
     }
 
 
@@ -563,4 +828,17 @@ public class ScanDataProcessorFunction
         public DateTime End { get; set; }
         public List<RfidScan> Scans { get; set; } = new();
     }
+}
+
+internal class MissingEquipmentCases
+{
+    public Guid MissingEquipmentCaseId { get; set; }
+    public Guid TruckId { get; set; }
+    public Guid? DriverId { get; set; }
+    public object SiteId { get; set; }
+    public DateTime OpenedAt { get; set; }
+    public DateTime LastSeenAt { get; set; }
+    public object Status { get; set; }
+    public object Severity { get; set; }
+    public List<MissingEquipmentCaseItem> Items { get; set; }
 }

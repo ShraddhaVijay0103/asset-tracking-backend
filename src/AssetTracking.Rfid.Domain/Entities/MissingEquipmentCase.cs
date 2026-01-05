@@ -38,7 +38,7 @@ public class MissingEquipmentCase
 
     [Column("closed_at")]
     public DateTimeOffset? ClosedAt { get; set; }
-
+     
     [Column("open_notes")]
     public string? OpenNotes { get; set; }
 
