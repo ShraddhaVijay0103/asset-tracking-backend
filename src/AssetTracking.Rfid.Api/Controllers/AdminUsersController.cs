@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
 
 namespace SouthernBotanical.Rfid.Api.Controllers;
 
@@ -163,6 +164,7 @@ public class AdminUsersController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
             user.Password = HashPassword(request.Password);
+            user.ConfirmPassword = HashPassword(request.ConfirmPassword);
         }
 
         _db.Users.Update(user);
@@ -216,7 +218,9 @@ public class AdminUsersController : ControllerBase
         if (user == null)
             return BadRequest(new { message = "User does not exist." });
 
-        if (user.Password != request.Password)
+        var hashedInputPassword = HashPassword(request.Password);
+
+        if (user.Password != hashedInputPassword)
             return BadRequest(new { message = "Invalid password." });
 
         var role = await _db.Roles
@@ -239,6 +243,5 @@ public class AdminUsersController : ControllerBase
             }
         });
     }
-
 }
 
