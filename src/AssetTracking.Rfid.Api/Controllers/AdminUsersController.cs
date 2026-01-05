@@ -29,14 +29,32 @@ public class AdminUsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+    public async Task<IActionResult> GetUsers()
     {
-        var list = await _db.Users
+        var users = await _db.Users
             .Include(u => u.Role)
+            .Include(u => u.Site)
             .ToListAsync();
 
-        return Ok(list);
+        var result = users.Select(u => new
+        {
+            u.UserId,
+            u.FullName,
+            u.UserName,
+            u.PhoneNo,
+            u.Email,
+            u.Password,
+            u.ConfirmPassword,
+            u.Site.SiteId,
+            u.Site.Name,
+            u.Role.RoleId,
+            RoleName = u.Role.Name
+
+        });
+
+        return Ok(result);
     }
+
 
     [AllowAnonymous]
     [HttpPost("{siteId}")]
@@ -139,7 +157,7 @@ public class AdminUsersController : ControllerBase
         user.UserName = request.UserName;
         user.PhoneNo = request.PhoneNo;
         user.Email = request.Email;
-        user.SiteId = siteId; 
+        user.SiteId = siteId;
         user.RoleId = request.RoleId;
 
         if (!string.IsNullOrWhiteSpace(request.Password))
