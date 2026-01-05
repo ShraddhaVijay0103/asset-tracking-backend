@@ -16,7 +16,7 @@ public class Reader
     // Direction of vehicle flow at this reader: "Entry" (Check-In) or "Exit" (Check-Out)
     [Column("direction")]
     public string? Direction { get; set; }
-    [Column("siteid")]
+    [Column("site_id")]
     public Guid SiteId { get; set; }
     public Site? Site { get; set; }
     public ICollection<GateEvent> GateEvents { get; set; } = new List<GateEvent>();
