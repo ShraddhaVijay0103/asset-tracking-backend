@@ -30,6 +30,9 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ReaderHeartbeat> ReaderHeartbeats => Set<ReaderHeartbeat>();
     public DbSet<RfidScan> RfidScans => Set<RfidScan>();
+    public DbSet<MissingEquipmentStatus> MissingEquipmentStatus => Set<MissingEquipmentStatus>();
+    public DbSet<MissingEquipmentCase> MissingEquipmentCases => Set<MissingEquipmentCase>();
+    public DbSet<MissingEquipmentSeverity> MissingEquipmentSeverity => Set<MissingEquipmentSeverity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
