@@ -65,7 +65,5 @@ public class UpdateUserRequest
     [StringLength(50, MinimumLength = 8)]
     public string? ConfirmPassword { get; set; }
 
-    public Guid? SiteId { get; set; }
-
     public Guid? RoleId { get; set; }
 }

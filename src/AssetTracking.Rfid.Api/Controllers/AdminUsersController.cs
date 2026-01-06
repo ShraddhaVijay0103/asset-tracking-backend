@@ -112,17 +112,21 @@ public class AdminUsersController : ControllerBase
         });
     }
 
-
     [AllowAnonymous]
-    [HttpPut("{userId}")]
-    public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] UpdateUserRequest request)
+    [HttpPut("{userId}/{siteId}")]
+    public async Task<IActionResult> UpdateUser(
+    Guid userId,
+    Guid siteId,
+    [FromBody] UpdateUserRequest request)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var user = await _db.Users.FindAsync(userId);
+        var user = await _db.Users
+            .FirstOrDefaultAsync(u => u.UserId == userId && u.SiteId == siteId);
+
         if (user == null)
-            return NotFound("User not found.");
+            return NotFound("User not found for the given site.");
 
         // Full Name
         if (!string.IsNullOrWhiteSpace(request.FullName))
@@ -155,7 +159,6 @@ public class AdminUsersController : ControllerBase
                 return BadRequest("Password and ConfirmPassword do not match.");
 
             user.Password = HashPassword(request.Password);
-            user.ConfirmPassword = HashPassword(request.ConfirmPassword);
         }
 
         // Role
@@ -168,18 +171,6 @@ public class AdminUsersController : ControllerBase
                 return BadRequest("Invalid RoleId.");
 
             user.RoleId = request.RoleId.Value;
-        }
-
-        // Site
-        if (request.SiteId.HasValue)
-        {
-            bool siteExists = await _db.Sites
-                .AnyAsync(s => s.SiteId == request.SiteId.Value);
-
-            if (!siteExists)
-                return BadRequest("Invalid SiteId.");
-
-            user.SiteId = request.SiteId.Value;
         }
 
         await _db.SaveChangesAsync();
