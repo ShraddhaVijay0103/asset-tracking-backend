@@ -1,16 +1,42 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace AssetTracking.Rfid.Api.Models;
+
+using System.ComponentModel.DataAnnotations;
 
 public class CreateUserRequest
 {
+    [Required]
+    [StringLength(50, MinimumLength = 2)]
     public string FullName { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(50, MinimumLength = 3)]
     public string UserName { get; set; } = string.Empty;
-    public string PhoneNo { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-    public string ConfirmPassword { get; set; } = string.Empty;
+
+    [StringLength(10)]
+    [RegularExpression(@"^\+?[0-9]{7,20}$", ErrorMessage = "Invalid phone number.")]
+    public string? PhoneNo { get; set; }
+
+    [Required]
+    [EmailAddress]
+    [StringLength(75)]
     public string Email { get; set; } = string.Empty;
-    public Guid SiteId { get; set; }
+
+    [Required]
+    [StringLength(50, MinimumLength = 8)]
+    public string Password { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(50, MinimumLength = 8)]
+    public string ConfirmPassword { get; set; } = string.Empty;
+
+    [Required]
     public Guid RoleId { get; set; }
+
+    // SiteId will come from route
 }
+
 
 public class UpdateUserRoleRequest
 {
@@ -19,12 +45,27 @@ public class UpdateUserRoleRequest
 
 public class UpdateUserRequest
 {
-    public string FullName { get; set; }
-    public string UserName { get; set; }
-    public string PhoneNo { get; set; }
-    public string Email { get; set; }
-    public string Password { get; set; }
-    public string ConfirmPassword { get; set; }
-    public Guid SiteId { get; set; }
-    public Guid RoleId { get; set; }
+    [StringLength(50, MinimumLength = 2)]
+    public string? FullName { get; set; }
+
+    [StringLength(50, MinimumLength = 3)]
+    public string? UserName { get; set; }
+
+    [StringLength(10)]
+    [RegularExpression(@"^\+?[0-9]{7,20}$", ErrorMessage = "Invalid phone number.")]
+    public string? PhoneNo { get; set; }
+
+    [EmailAddress]
+    [StringLength(75)]
+    public string? Email { get; set; }
+
+    [StringLength(50, MinimumLength = 8)]
+    public string? Password { get; set; }
+
+    [StringLength(50, MinimumLength = 8)]
+    public string? ConfirmPassword { get; set; }
+
+    public Guid? SiteId { get; set; }
+
+    public Guid? RoleId { get; set; }
 }

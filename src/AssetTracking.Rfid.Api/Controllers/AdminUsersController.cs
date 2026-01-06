@@ -56,47 +56,43 @@ public class AdminUsersController : ControllerBase
         return Ok(result);
     }
 
-
     [AllowAnonymous]
     [HttpPost("{siteId}")]
-    public async Task<ActionResult<User>> CreateUser(Guid siteId, [FromBody] CreateUserRequest request)
+    public async Task<IActionResult> CreateUser(Guid siteId, [FromBody] CreateUserRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.FullName))
-            return BadRequest("FullName is required.");
-
-        if (string.IsNullOrWhiteSpace(request.UserName))
-            return BadRequest("UserName is required.");
-
-        if (string.IsNullOrWhiteSpace(request.Email) || !new EmailAddressAttribute().IsValid(request.Email))
-            return BadRequest("Valid Email is required.");
-
-        if (string.IsNullOrWhiteSpace(request.Password))
-            return BadRequest("Password is required.");
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
         if (request.Password != request.ConfirmPassword)
             return BadRequest("Password and ConfirmPassword do not match.");
 
-        bool emailExists = await _db.Users.AnyAsync(u => u.Email == request.Email);
+        bool emailExists = await _db.Users
+            .AnyAsync(u => u.Email == request.Email);
+
         if (emailExists)
             return BadRequest("Email already exists.");
 
-        var roleExists = await _db.Roles.AnyAsync(r => r.RoleId == request.RoleId);
+        bool roleExists = await _db.Roles
+            .AnyAsync(r => r.RoleId == request.RoleId);
+
         if (!roleExists)
             return BadRequest("Invalid RoleId.");
 
-        var siteExists = await _db.Sites.AnyAsync(s => s.SiteId == siteId);
+        bool siteExists = await _db.Sites
+            .AnyAsync(s => s.SiteId == siteId);
+
         if (!siteExists)
             return BadRequest("Invalid SiteId.");
-
 
         var user = new User
         {
             UserId = Guid.NewGuid(),
-            FullName = request.FullName,
-            UserName = request.UserName,
+            FullName = request.FullName.Trim(),
+            UserName = request.UserName.Trim(),
             PhoneNo = request.PhoneNo,
-            Email = request.Email,
+            Email = request.Email.Trim().ToLower(),
             Password = HashPassword(request.Password),
+            ConfirmPassword = HashPassword(request.ConfirmPassword),
             SiteId = siteId,
             RoleId = request.RoleId
         };
@@ -104,7 +100,7 @@ public class AdminUsersController : ControllerBase
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
-        return Ok(new
+        return CreatedAtAction(nameof(CreateUser), new
         {
             user.UserId,
             user.FullName,
@@ -116,26 +112,31 @@ public class AdminUsersController : ControllerBase
         });
     }
 
+
     [AllowAnonymous]
-    [HttpPut("{userId}/{siteId}")]
-    public async Task<ActionResult<User>> UpdateUser(Guid userId, Guid siteId, [FromBody] UpdateUserRequest request)
+    [HttpPut("{userId}")]
+    public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] UpdateUserRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.FullName))
-            return BadRequest("FullName is required.");
-
-        if (string.IsNullOrWhiteSpace(request.UserName))
-            return BadRequest("UserName is required.");
-
-        if (string.IsNullOrWhiteSpace(request.Email) || !new EmailAddressAttribute().IsValid(request.Email))
-            return BadRequest("Valid Email is required.");
-
-        if (!string.IsNullOrWhiteSpace(request.Password) && request.Password != request.ConfirmPassword)
-            return BadRequest("Password and ConfirmPassword do not match.");
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
         var user = await _db.Users.FindAsync(userId);
         if (user == null)
             return NotFound("User not found.");
 
+        // Full Name
+        if (!string.IsNullOrWhiteSpace(request.FullName))
+            user.FullName = request.FullName;
+
+        // Username
+        if (!string.IsNullOrWhiteSpace(request.UserName))
+            user.UserName = request.UserName;
+
+        // Phone
+        if (!string.IsNullOrWhiteSpace(request.PhoneNo))
+            user.PhoneNo = request.PhoneNo;
+
+        // Email
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
             bool emailExists = await _db.Users
@@ -143,31 +144,44 @@ public class AdminUsersController : ControllerBase
 
             if (emailExists)
                 return BadRequest("Email already exists.");
+
+            user.Email = request.Email;
         }
 
-        var roleExists = await _db.Roles.AnyAsync(r => r.RoleId == request.RoleId);
-        if (!roleExists)
-            return BadRequest("Invalid RoleId.");
-
-        var siteExists = await _db.Sites.AnyAsync(s => s.SiteId == siteId);
-        if (!siteExists)
-            return BadRequest("Invalid SiteId.");
-
-
-        user.FullName = request.FullName;
-        user.UserName = request.UserName;
-        user.PhoneNo = request.PhoneNo;
-        user.Email = request.Email;
-        user.SiteId = siteId;
-        user.RoleId = request.RoleId;
-
+        // Password
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
+            if (request.Password != request.ConfirmPassword)
+                return BadRequest("Password and ConfirmPassword do not match.");
+
             user.Password = HashPassword(request.Password);
             user.ConfirmPassword = HashPassword(request.ConfirmPassword);
         }
 
-        _db.Users.Update(user);
+        // Role
+        if (request.RoleId.HasValue)
+        {
+            bool roleExists = await _db.Roles
+                .AnyAsync(r => r.RoleId == request.RoleId.Value);
+
+            if (!roleExists)
+                return BadRequest("Invalid RoleId.");
+
+            user.RoleId = request.RoleId.Value;
+        }
+
+        // Site
+        if (request.SiteId.HasValue)
+        {
+            bool siteExists = await _db.Sites
+                .AnyAsync(s => s.SiteId == request.SiteId.Value);
+
+            if (!siteExists)
+                return BadRequest("Invalid SiteId.");
+
+            user.SiteId = request.SiteId.Value;
+        }
+
         await _db.SaveChangesAsync();
 
         return Ok(new
@@ -181,6 +195,7 @@ public class AdminUsersController : ControllerBase
             user.RoleId
         });
     }
+
 
     private string HashPassword(string password)
     {
