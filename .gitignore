@@ -33,3 +33,4 @@ Properties/PublishProfiles/
 # Ignore files generated under each project
 **/bin/
 **/obj/
+be-asset-tracking_old/be-asset-tracking/ 
