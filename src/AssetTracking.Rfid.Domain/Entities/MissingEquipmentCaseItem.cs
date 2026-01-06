@@ -26,4 +26,7 @@ public class MissingEquipmentCaseItem
 
     [Column("recovered_at")]
     public DateTimeOffset? RecoveredAt { get; set; }
+
+    [Column("site_id")]
+    public Guid SiteId { get; set; }
 }

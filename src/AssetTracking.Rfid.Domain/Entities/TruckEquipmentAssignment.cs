@@ -23,4 +23,7 @@ public class TruckEquipmentAssignment
 
     [Column("returned_at")]
     public DateTime? ReturnedAt { get; set; }
+
+    [Column("site_id")]
+    public Guid SiteId { get; set; }
 }

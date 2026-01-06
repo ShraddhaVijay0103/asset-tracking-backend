@@ -16,5 +16,7 @@ public class TruckEquipmentTemplate
     public EquipmentType? EquipmentType { get; set; }
     [Column("required_count")]
     public int RequiredCount { get; set; }
+    [Column("site_id")]
+    public Guid SiteId { get; set; }
 }
 

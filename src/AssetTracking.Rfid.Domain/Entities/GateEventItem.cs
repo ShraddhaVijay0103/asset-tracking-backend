@@ -20,4 +20,7 @@ public class GateEventItem
 
     [Column("epc")]
     public string Epc { get; set; } = string.Empty;
+
+    [Column("site_id")]
+    public Guid SiteId { get; set; }
 }

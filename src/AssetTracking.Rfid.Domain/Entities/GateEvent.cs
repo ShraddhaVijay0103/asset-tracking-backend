@@ -35,5 +35,8 @@ public class GateEvent
     [Column("notes")]
     public string? Notes { get; set; }
 
+    [Column("site_id")]
+    public Guid SiteId { get; set; }
+
     public ICollection<GateEventItem> Items { get; set; } = new List<GateEventItem>();
 }
