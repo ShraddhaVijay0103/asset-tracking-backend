@@ -228,94 +228,31 @@ public class TrucksController : ControllerBase
 
         return Ok(list);
     }
+
+
     [AllowAnonymous]
-    [HttpGet("site/{siteId:guid}/checkout-in-status")]
-    public async Task<IActionResult> GetCheckoutInStatusBySite(Guid siteId)
+    [HttpGet("site/{siteId:guid}/truck/{truckId:guid}/complete-status")]
+    public async Task<IActionResult> GetCompleteStatusByTruck(Guid siteId, Guid truckId)
     {
-        var trucks = await _db.Trucks
-            .Where(t => t.SiteId == siteId)
+        // Verify truck belongs to the site
+        var truck = await _db.Trucks
+            .Where(t => t.SiteId == siteId && t.TruckId == truckId)
             .Include(t => t.Driver)
+            .FirstOrDefaultAsync();
+
+        if (truck == null)
+            return NotFound(new { Message = "Truck not found in this site" });
+
+        // ================= 1. GET TRUCK TEMPLATES =================
+        var templates = await _db.TruckEquipmentTemplates
+            .Where(t => t.TruckId == truckId)
+            .Include(t => t.EquipmentType)
             .ToListAsync();
 
-        if (!trucks.Any())
-            return NotFound();
-
-        var results = new List<object>();
-
-        foreach (var truck in trucks)
-        {
-            var truckId = truck.TruckId;
-
-            // =========================
-            // ACTIVE ASSIGNMENTS (CHECK-OUT)
-            // =========================
-            var activeAssignments = await _db.TruckEquipmentAssignments
-                .Where(a => a.TruckId == truckId && a.ReturnedAt == null)
-                .Include(a => a.Equipment)
-                .ToListAsync();
-
-            // =========================
-            // REQUIRED TEMPLATES
-            // =========================
-            var templates = await _db.TruckEquipmentTemplates
-                .Where(t => t.TruckId == truckId)
-                .Include(t => t.EquipmentType)
-                .ToListAsync();
-
-            // =========================
-            // CHECK-OUT TABLE
-            // =========================
-            var checkoutTable = new List<object>();
-
-            foreach (var template in templates)
+        if (!templates.Any())
+            return Ok(new
             {
-                var assigned = activeAssignments
-                    .Where(a => a.Equipment.EquipmentTypeId == template.EquipmentTypeId)
-                    .ToList();
-
-                for (int i = 0; i < template.RequiredCount; i++)
-                {
-                    var item = i < assigned.Count ? assigned[i] : null;
-
-                    // 🚫 Skip NOT ASSIGNED rows entirely
-                    if (item == null)
-                        continue;
-
-                    checkoutTable.Add(new
-                    {
-                        Equipment = item.Equipment.Name,
-                        Required = 1,
-                        Detected = "✓",
-                        EquipmentId = item.EquipmentId
-                    });
-                }
-            }
-
-
-            // =========================
-            // CHECK-IN (MISSING STATUS)
-            // SOURCE OF TRUTH:
-            // missing_equipment_case_items.recovered_at IS NULL
-            // =========================
-            var missingItems = await _db.MissingEquipmentCases
-                .Where(c =>
-                    c.SiteId == siteId &&
-                    c.TruckId == truckId &&
-                    c.ClosedAt == null)
-                .SelectMany(c => c.Items)
-                .Where(i => i.RecoveredAt == null)
-                .Include(i => i.Equipment)
-                .ToListAsync();
-
-            var checkinTable = missingItems.Select(i => new
-            {
-                Equipment = i.Equipment.Name,
-                GateStatus = "MISSING",
-                EquipmentId = i.EquipmentId
-            }).ToList();
-
-            results.Add(new
-            {
+                SiteId = siteId,
                 Truck = new
                 {
                     truck.TruckId,
@@ -324,34 +261,183 @@ public class TrucksController : ControllerBase
                 },
                 CheckOut = new
                 {
-                    Table = checkoutTable,
-                    Summary = new
-                    {
-                        TotalRequired = templates.Sum(t => t.RequiredCount),
-                        TotalAssigned = activeAssignments.Count
-                    }
+                    Table = new List<object>(),
+                    Summary = new { TotalRequired = 0, TotalAssigned = 0 }
                 },
                 CheckIn = new
                 {
                     LastCheckinTime = (DateTime?)null,
-                    Table = checkinTable,
-                    Summary = new
-                    {
-                        TotalExpected = missingItems.Count,
-                        TotalDetected = 0,
-                        MissingCount = missingItems.Count
-                    }
+                    Table = new List<object>(),
+                    Summary = new { TotalExpected = 0, TotalDetected = 0, MissingCount = 0 }
                 }
             });
+
+        // ================= 2. GET LATEST GATE EVENTS =================
+        var lastEntryEvent = await _db.GateEvents
+            .Where(e => e.TruckId == truckId && e.EventType == "Entry")
+            .OrderByDescending(e => e.EventTime)
+            .FirstOrDefaultAsync();
+
+        var lastExitEvent = await _db.GateEvents
+            .Where(e => e.TruckId == truckId && e.EventType == "Exit")
+            .OrderByDescending(e => e.EventTime)
+            .FirstOrDefaultAsync();
+
+        // ================= 3. GET ENTRY EQUIPMENT =================
+        var entryEquipment = new List<Equipment>();
+        var entryEquipmentIds = new List<Guid>();
+
+        if (lastEntryEvent != null)
+        {
+            entryEquipmentIds = await _db.GateEventItems
+                .Where(gei => gei.GateEventId == lastEntryEvent.GateEventId)
+                .Select(gei => gei.EquipmentId)
+                .ToListAsync();
+
+            entryEquipment = await _db.Equipment
+                .Where(eq => entryEquipmentIds.Contains(eq.EquipmentId))
+                .Include(e => e.EquipmentType)
+                .ToListAsync();
         }
 
+        // ================= 4. GET EXIT EQUIPMENT =================
+        var exitEquipment = new List<Equipment>();
+        var exitEquipmentIds = new List<Guid>();
+
+        if (lastExitEvent != null)
+        {
+            exitEquipmentIds = await _db.GateEventItems
+                .Where(gei => gei.GateEventId == lastExitEvent.GateEventId)
+                .Select(gei => gei.EquipmentId)
+                .ToListAsync();
+
+            exitEquipment = await _db.Equipment
+                .Where(eq => exitEquipmentIds.Contains(eq.EquipmentId))
+                .Include(e => e.EquipmentType)
+                .ToListAsync();
+        }
+
+        // ================= 5. BUILD CHECK-OUT TABLE =================
+        // Check-out should show what was detected at the EXIT event
+        var checkoutTable = new List<object>();
+
+        foreach (var template in templates)
+        {
+            var equipmentTypeId = template.EquipmentTypeId;
+            var requiredCount = template.RequiredCount;
+
+            // Get equipment of this type from EXIT event
+            var exitEquipmentOfType = exitEquipment
+                .Where(e => e.EquipmentTypeId == equipmentTypeId)
+                .ToList();
+
+            // Get all equipment names of this type for display
+            var allEquipmentOfType = await _db.Equipment
+                .Where(e => e.EquipmentTypeId == equipmentTypeId)
+                .ToListAsync();
+
+            var equipmentTypeName = template.EquipmentType?.Name ?? $"Equipment Type {equipmentTypeId}";
+
+            for (int i = 0; i < requiredCount; i++)
+            {
+                if (i < exitEquipmentOfType.Count)
+                {
+                    // Equipment detected at exit
+                    var equipment = exitEquipmentOfType[i];
+                    checkoutTable.Add(new
+                    {
+                        Equipment = equipment.Name,
+                        Required = 1,
+                        Detected = "✓",
+                        EquipmentId = equipment.EquipmentId
+                    });
+                }
+                else
+                {
+                    // Not detected at exit
+                    var defaultEquipment = allEquipmentOfType.FirstOrDefault();
+                    checkoutTable.Add(new
+                    {
+                        Equipment = defaultEquipment?.Name ?? $"{equipmentTypeName} - Not Detected",
+                        Required = 1,
+                        Detected = "✓",
+                        EquipmentId = defaultEquipment.EquipmentId
+                    });
+                }
+            }
+        }
+
+        // ================= 6. BUILD CHECK-IN TABLE =================
+        // Check-in should show equipment that was at ENTRY but NOT at EXIT
+        var checkinTable = new List<object>();
+
+        if (lastEntryEvent != null)
+        {
+            // Find equipment that was in entry but not in exit
+            var missingEquipment = entryEquipment
+                .Where(entryEq => !exitEquipmentIds.Contains(entryEq.EquipmentId))
+                .ToList();
+
+            foreach (var missing in missingEquipment)
+            {
+                checkinTable.Add(new
+                {
+                    Equipment = missing.Name,
+                    GateStatus = "MISSING",
+                    EquipmentId = missing.EquipmentId
+                });
+            }
+        }
+
+        // ================= 7. RETURN RESULT =================
         return Ok(new
         {
             SiteId = siteId,
-            TotalTrucks = results.Count,
-            Trucks = results
+            Truck = new
+            {
+                truck.TruckId,
+                truck.TruckNumber,
+                Driver = truck.Driver?.FullName
+            },
+            CheckOut = new
+            {
+                Table = checkoutTable,
+                Summary = new
+                {
+                    TotalRequired = templates.Sum(t => t.RequiredCount),
+                    TotalAssigned = exitEquipment.Count
+                }
+            },
+            CheckIn = new
+            {
+                LastCheckinTime = lastEntryEvent?.EventTime,
+                Table = checkinTable,
+                Summary = new
+                {
+                    TotalExpected = entryEquipment.Count,
+                    TotalDetected = exitEquipment.Count,
+                    MissingCount = checkinTable.Count
+                }
+            }
         });
     }
+    // Helper classes for structured response
+    public class CheckoutRow
+    {
+        public string Equipment { get; set; }
+        public int Required { get; set; }
+        public string Detected { get; set; }
+        public Guid? EquipmentId { get; set; }
+    }
+
+    public class CheckinRow
+    {
+        public string Equipment { get; set; }
+        public string GateStatus { get; set; }
+        public Guid? EquipmentId { get; set; }
+    }
+
+
 
 
 }
