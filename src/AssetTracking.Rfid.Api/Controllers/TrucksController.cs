@@ -249,6 +249,11 @@ public class TrucksController : ControllerBase
         {
             var truckId = truck.TruckId;
 
+            var truckPresent = await _db.GateEvents
+                .AnyAsync(g => g.TruckId == truck.TruckId && g.SiteId == siteId);
+
+            if (!truckPresent)
+                continue;
             // ================= 1. GET TRUCK TEMPLATES =================
             var templates = await _db.TruckEquipmentTemplates
                 .Where(t => t.TruckId == truckId && t.SiteId == siteId)
