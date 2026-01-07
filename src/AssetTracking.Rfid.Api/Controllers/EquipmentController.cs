@@ -235,10 +235,7 @@ public class EquipmentController : ControllerBase
             RecentlyClearedToday = recentlyClearedToday
         };
 
-        if (todayMissing == 0 && thisWeekMissing == 0 && thisMonthMissing == 0
-            && longOverdue == 0 && recentlyClearedToday == 0)
-            return NotFound();
-
+        // Always return response, counts will be 0 if no records
         return Ok(response);
     }
 
@@ -256,7 +253,7 @@ public class EquipmentController : ControllerBase
                 RecoveredAt = i.RecoveredAt,
                 SeverityId = c.SeverityId
             })
-            .Where(x => x.RecoveredAt == null && x.SeverityId >= 3); 
+            .Where(x => x.RecoveredAt == null && x.SeverityId >= 3);
 
         var criticalSeverityCount = await itemsQuery
             .Where(x => x.SeverityId > 3)

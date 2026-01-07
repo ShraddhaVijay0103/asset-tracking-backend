@@ -306,74 +306,36 @@ public class TrucksController : ControllerBase
             }
 
             // ================= 5. BUILD CHECK-OUT TABLE =================
-            var checkoutTable = new List<object>();
 
-            foreach (var template in templates)
+            var checkoutTable = entryEquipment.Select(e => new
             {
-                var equipmentTypeId = template.EquipmentTypeId;
-                var requiredCount = template.RequiredCount;
+                Equipment = e.Name,
+                Required = 1,
+                Detected = "✓",
+                EquipmentId = e.EquipmentId
+            }).ToList();
 
-                // Get equipment of this type from EXIT event
-                var exitEquipmentOfType = exitEquipment
-                    .Where(e => e.EquipmentTypeId == equipmentTypeId)
-                    .ToList();
-
-                // Get all equipment names of this type for display
-                var allEquipmentOfType = await _db.Equipment
-                    .Where(e => e.EquipmentTypeId == equipmentTypeId)
-                    .ToListAsync();
-
-                var equipmentTypeName = template.EquipmentType?.Name ?? $"Equipment Type {equipmentTypeId}";
-
-                for (int i = 0; i < requiredCount; i++)
-                {
-                    if (i < exitEquipmentOfType.Count)
-                    {
-                        // Equipment detected at exit
-                        var equipment = exitEquipmentOfType[i];
-                        checkoutTable.Add(new
-                        {
-                            Equipment = equipment.Name,
-                            Required = 1,
-                            Detected = "✓",
-                            EquipmentId = equipment.EquipmentId
-                        });
-                    }
-                    else
-                    {
-                        // Not detected at exit
-                        var defaultEquipment = allEquipmentOfType.FirstOrDefault();
-                        checkoutTable.Add(new
-                        {
-                            Equipment = defaultEquipment?.Name ?? $"{equipmentTypeName} - Not Detected",
-                            Required = 1,
-                            Detected = "✓",
-                            EquipmentId = defaultEquipment.EquipmentId
-                        });
-                    }
-                }
-            }
+            var checkOutSummary = new
+            {
+                totalRequired = checkoutTable.Count,
+                totalAssigned = entryEquipment.Count
+            };
 
             // ================= 6. BUILD CHECK-IN TABLE =================
-            var checkinTable = new List<object>();
+            //var checkinTable = new List<object>();
 
-            if (lastEntryEvent != null)
+            var checkinTable = exitEquipment.Select(e => new
             {
-                // Find equipment that was in entry but not in exit
-                var missingEquipment = entryEquipment
-                    .Where(entryEq => !exitEquipmentIds.Contains(entryEq.EquipmentId))
-                    .ToList();
+                Equipment = e.Name,
+                GateStatus = "MISSING",
+                EquipmentId = e.EquipmentId
+            }).ToList();
 
-                foreach (var missing in missingEquipment)
-                {
-                    checkinTable.Add(new
-                    {
-                        Equipment = missing.Name,
-                        GateStatus = "MISSING",
-                        EquipmentId = missing.EquipmentId
-                    });
-                }
-            }
+            var checkInSummary = new
+            {
+                totalRequired = checkoutTable.Count,
+                totalAssigned = exitEquipment.Count
+            };
 
             // Add result for this truck
             results.Add(new
