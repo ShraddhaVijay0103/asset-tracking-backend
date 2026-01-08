@@ -8,7 +8,11 @@ public class CreateUserRequest
 {
     [Required]
     [StringLength(50, MinimumLength = 2)]
-    public string FullName { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(50, MinimumLength = 2)]
+    public string LastName { get; set; } = string.Empty;
 
     [Required]
     [StringLength(50, MinimumLength = 3)]
@@ -29,17 +33,18 @@ public class CreateUserRequest
 
     [Required]
     [StringLength(50, MinimumLength = 8)]
+    [Compare(nameof(Password), ErrorMessage = "Password and ConfirmPassword do not match.")]
     public string ConfirmPassword { get; set; } = string.Empty;
 
     [Required]
     public Guid RoleId { get; set; }
 
-    // SiteId will come from route
-}
+
 
 
 public class UpdateUserRoleRequest
 {
+    public Guid SiteId { get; set; }
     public Guid RoleId { get; set; }
 }
 

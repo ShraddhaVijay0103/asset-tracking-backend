@@ -1,6 +1,7 @@
+using AssetTracking.Rfid.Api.Models;
+using AssetTracking.Rfid.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
-using AssetTracking.Rfid.Domain.Entities;
 
 namespace AssetTracking.Rfid.Infrastructure.Persistence;
 
@@ -34,6 +35,7 @@ public class AppDbContext : DbContext
     public DbSet<MissingEquipmentCaseItem> MissingEquipmentCaseItems => Set<MissingEquipmentCaseItem>();
     public DbSet<MissingEquipmentSeverity> MissingEquipmentSeverities => Set<MissingEquipmentSeverity>();
     public DbSet<MissingEquipmentStatus> MissingEquipmentStatuses => Set<MissingEquipmentStatus>();
+    public DbSet<UserSiteRole> UserSiteRoles => Set<UserSiteRole>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -63,6 +65,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<MissingEquipmentCaseItem>().HasKey(e => e.MissingEquipmentCaseItemId);
         modelBuilder.Entity<MissingEquipmentSeverity>().HasKey(e => e.SeverityId);
         modelBuilder.Entity<MissingEquipmentStatus>().HasKey(e => e.StatusId);
+        modelBuilder.Entity<UserSiteRole>().HasKey(e => e.UserSiteRoleId);
 
     }
 }
