@@ -50,7 +50,10 @@ public class UpdateUserRoleRequest
 public class UpdateUserRequest
 {
     [StringLength(50, MinimumLength = 2)]
-    public string? FullName { get; set; }
+    public string? FirstName { get; set; }
+
+    [StringLength(50, MinimumLength = 2)]
+    public string? LastName { get; set; }
 
     [StringLength(50, MinimumLength = 3)]
     public string? UserName { get; set; }
@@ -66,7 +69,7 @@ public class UpdateUserRequest
     [StringLength(50, MinimumLength = 8)]
     public string? Password { get; set; }
 
-    [StringLength(50, MinimumLength = 8)]
+    [Compare(nameof(Password), ErrorMessage = "Password and ConfirmPassword do not match.")]
     public string? ConfirmPassword { get; set; }
 
     public Guid? RoleId { get; set; }
