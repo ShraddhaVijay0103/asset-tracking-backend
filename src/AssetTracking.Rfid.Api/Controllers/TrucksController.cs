@@ -203,12 +203,11 @@ public class TrucksController : ControllerBase
     [HttpGet("drivers")]
     public async Task<ActionResult<IEnumerable<DriverRequest>>> GetDrivers()
     {
-        var drivers = await _db.Users
-            .Where(u => u.Role.Name == "Driver")
-            .Select(u => new DriverRequest
+        var drivers = await _db.Drivers
+            .Select(d => new DriverRequest
             {
-                userId = u.UserId,
-                driverName = u.FullName
+                userId = d.DriverId,
+                driverName = d.FullName
             })
             .ToListAsync();
 

@@ -202,7 +202,6 @@ public class AdminUsersController : ControllerBase
         });
     }
 
-
     private string HashPassword(string password)
     {
         using (var sha256 = System.Security.Cryptography.SHA256.Create())
