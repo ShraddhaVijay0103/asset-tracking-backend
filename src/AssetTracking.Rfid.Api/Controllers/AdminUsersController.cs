@@ -155,24 +155,42 @@ public class AdminUsersController : ControllerBase
             return BadRequest(ModelState);
 
         var user = await _db.Users
-            .FirstOrDefaultAsync(x => x.UserId == userId);
+            .FirstOrDefaultAsync(u => u.UserId == userId);
 
         if (user == null)
             return NotFound("User not found.");
 
-        /* ---------- USER FIELDS ---------- */
-
+        /* ---------- USERNAME ---------- */
         if (!string.IsNullOrWhiteSpace(request.UserName))
         {
-            bool userNameExists = await _db.Users
-                .AnyAsync(u => u.UserName == request.UserName && u.UserId != userId);
+            var existingUserName = await _db.Users
+                .FirstOrDefaultAsync(u => u.UserName == request.UserName);
 
-            if (userNameExists)
-                return BadRequest("Username already exists.");
+            if (existingUserName != null && existingUserName.UserId != userId)
+            {
+                return BadRequest("Username already exists for another user.");
+            }
 
             user.UserName = request.UserName.Trim();
         }
 
+        /* ---------- EMAIL ---------- */
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var existingEmail = await _db.Users
+                .FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            if (existingEmail != null && existingEmail.UserId != userId)
+            {
+                return BadRequest("Email already exists for another user.");
+            }
+
+            // Optional: update email if allowed
+            // Comment this line if email should be ignored
+            user.Email = request.Email.Trim().ToLower();
+        }
+
+        /* ---------- OTHER FIELDS ---------- */
         if (!string.IsNullOrWhiteSpace(request.FirstName))
             user.FirstName = request.FirstName.Trim();
 
@@ -183,7 +201,6 @@ public class AdminUsersController : ControllerBase
             user.PhoneNo = request.PhoneNo.Trim();
 
         /* ---------- PASSWORD ---------- */
-
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
             if (request.Password != request.ConfirmPassword)
@@ -192,13 +209,9 @@ public class AdminUsersController : ControllerBase
             user.Password = HashPassword(request.Password);
         }
 
-        // Ignore Email completely
-        // user.Email is never updated
-
         user.UpdatedAt = DateTime.UtcNow;
 
         /* ---------- SITE & ROLE ---------- */
-
         if (request.Site == null || request.Site.Count == 0)
             return BadRequest("At least one SiteId is required.");
 
@@ -248,7 +261,6 @@ public class AdminUsersController : ControllerBase
             UserId = user.UserId
         });
     }
-
 
     private string HashPassword(string password)
     {
