@@ -128,9 +128,9 @@ public class AdminUsersController : ControllerBase
     [AllowAnonymous]
     [HttpPut("{userId}/{siteId}")]
     public async Task<IActionResult> UpdateUser(
-        Guid userId,
-        Guid siteId,
-        [FromBody] UpdateUserRequest request)
+      Guid userId,
+      Guid siteId,
+      [FromBody] UpdateUserRequest request)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
@@ -141,10 +141,11 @@ public class AdminUsersController : ControllerBase
         if (user == null)
             return NotFound("User not found.");
 
-        if (!string.IsNullOrWhiteSpace(request.FullName))
-        {
-            user.FirstName = request.FullName.Trim();
-        }
+        if (!string.IsNullOrWhiteSpace(request.FirstName))
+            user.FirstName = request.FirstName.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.LastName))
+            user.LastName = request.LastName.Trim();
 
         if (!string.IsNullOrWhiteSpace(request.UserName))
             user.UserName = request.UserName.Trim();
@@ -200,6 +201,7 @@ public class AdminUsersController : ControllerBase
             RoleId = request.RoleId
         });
     }
+
 
     private string HashPassword(string password)
     {
