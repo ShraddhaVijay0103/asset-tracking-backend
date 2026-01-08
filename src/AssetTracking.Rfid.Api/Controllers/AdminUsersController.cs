@@ -57,8 +57,8 @@ public class AdminUsersController : ControllerBase
     }
 
     [AllowAnonymous]
-    [HttpPost("{siteId}")]
-    public async Task<IActionResult> CreateUser(Guid siteId, [FromBody] CreateUserRequest request)
+    [HttpPost]
+    public async Task<IActionResult> CreateUser([FromBody] CreateUserMultiSiteRequest request)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
@@ -72,24 +72,34 @@ public class AdminUsersController : ControllerBase
         if (emailExists)
             return BadRequest("Email already exists.");
 
-        bool roleExists = await _db.Roles
-            .AnyAsync(r => r.RoleId == request.RoleId);
+        if (request.Site == null || !request.Site.Any())
+            return BadRequest("At least one site must be provided.");
 
-        if (!roleExists)
-            return BadRequest("Invalid RoleId.");
+        var validSites = await _db.Sites
+            .Where(s => request.Site.Contains(s.SiteId))
+            .Select(s => s.SiteId)
+            .ToListAsync();
 
-        bool siteExists = await _db.Sites
-            .AnyAsync(s => s.SiteId == siteId);
+        if (validSites.Count != request.Site.Count)
+            return BadRequest("One or more SiteIds are invalid.");
 
-        if (!siteExists)
-            return BadRequest("Invalid SiteId.");
+        if (request.Role == null || !request.Role.Any())
+            return BadRequest("At least one role must be provided.");
+
+        var validRoles = await _db.Roles
+            .Where(r => request.Role.Contains(r.RoleId))
+            .Select(r => r.RoleId)
+            .ToListAsync();
+
+        if (validRoles.Count != request.Role.Count)
+            return BadRequest("One or more RoleIds are invalid.");
 
         var user = new User
         {
             UserId = Guid.NewGuid(),
             UserName = request.UserName.Trim(),
-            FirstName = request.FirstName?.Trim() ?? string.Empty,
-            LastName = request.LastName?.Trim() ?? string.Empty,
+            FirstName = request.FirstName.Trim(),
+            LastName = request.LastName.Trim(),
             Email = request.Email.Trim().ToLower(),
             PhoneNo = request.PhoneNo,
             Password = HashPassword(request.Password),
@@ -100,37 +110,46 @@ public class AdminUsersController : ControllerBase
 
         _db.Users.Add(user);
 
-        var userSiteRole = new UserSiteRole
-        {
-            UserSiteRoleId = Guid.NewGuid(),
-            UserId = user.UserId,
-            SiteId = siteId,
-            RoleId = request.RoleId,
-            AssignedAt = DateTime.UtcNow,
-            IsActive = true
-        };
+        int siteCount = validSites.Count;
+        int roleCount = validRoles.Count;
 
-        _db.UserSiteRoles.Add(userSiteRole);
+        for (int i = 0; i < siteCount; i++)
+        {
+            Guid currentSite = validSites[i];
+            Guid currentRole;
+
+            if (i < roleCount)
+            {
+                currentRole = validRoles[i];
+            }
+            else
+            {
+                currentRole = validRoles.Last();
+            }
+
+            var userSiteRole = new UserSiteRole
+            {
+                UserSiteRoleId = Guid.NewGuid(),
+                UserId = user.UserId,
+                SiteId = currentSite,
+                RoleId = currentRole,
+                AssignedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            _db.UserSiteRoles.Add(userSiteRole);
+        }
 
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(CreateUser), new
-        {
-            user.UserId,
-            user.UserName,
-            user.Email,
-            user.PhoneNo,
-            SiteId = siteId,
-            request.RoleId
-        });
+        return Ok(new { Message = "User created successfully", userId = user.UserId });
     }
 
     [AllowAnonymous]
-    [HttpPut("{userId}/{siteId}")]
+    [HttpPut("{userId:guid}")]
     public async Task<IActionResult> UpdateUser(
-      Guid userId,
-      Guid siteId,
-      [FromBody] UpdateUserRequest request)
+     Guid userId,
+     [FromBody] UpdateUserMultiSiteRequest request)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
@@ -141,29 +160,47 @@ public class AdminUsersController : ControllerBase
         if (user == null)
             return NotFound("User not found.");
 
+        /* ---------- USERNAME ---------- */
+        if (!string.IsNullOrWhiteSpace(request.UserName))
+        {
+            var existingUserName = await _db.Users
+                .FirstOrDefaultAsync(u => u.UserName == request.UserName);
+
+            if (existingUserName != null && existingUserName.UserId != userId)
+            {
+                return BadRequest("Username already exists for another user.");
+            }
+
+            user.UserName = request.UserName.Trim();
+        }
+
+        /* ---------- EMAIL ---------- */
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var existingEmail = await _db.Users
+                .FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            if (existingEmail != null && existingEmail.UserId != userId)
+            {
+                return BadRequest("Email already exists for another user.");
+            }
+
+            // Optional: update email if allowed
+            // Comment this line if email should be ignored
+            user.Email = request.Email.Trim().ToLower();
+        }
+
+        /* ---------- OTHER FIELDS ---------- */
         if (!string.IsNullOrWhiteSpace(request.FirstName))
             user.FirstName = request.FirstName.Trim();
 
         if (!string.IsNullOrWhiteSpace(request.LastName))
             user.LastName = request.LastName.Trim();
 
-        if (!string.IsNullOrWhiteSpace(request.UserName))
-            user.UserName = request.UserName.Trim();
-
         if (!string.IsNullOrWhiteSpace(request.PhoneNo))
             user.PhoneNo = request.PhoneNo.Trim();
 
-        if (!string.IsNullOrWhiteSpace(request.Email))
-        {
-            bool emailExists = await _db.Users
-                .AnyAsync(u => u.Email == request.Email && u.UserId != userId);
-
-            if (emailExists)
-                return BadRequest("Email already exists.");
-
-            user.Email = request.Email.Trim().ToLower();
-        }
-
+        /* ---------- PASSWORD ---------- */
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
             if (request.Password != request.ConfirmPassword)
@@ -172,36 +209,58 @@ public class AdminUsersController : ControllerBase
             user.Password = HashPassword(request.Password);
         }
 
-        if (request.RoleId.HasValue)
+        user.UpdatedAt = DateTime.UtcNow;
+
+        /* ---------- SITE & ROLE ---------- */
+        if (request.Site == null || request.Site.Count == 0)
+            return BadRequest("At least one SiteId is required.");
+
+        if (request.Role == null || request.Role.Count == 0)
+            return BadRequest("At least one RoleId is required.");
+
+        var validSites = await _db.Sites
+            .Where(s => request.Site.Contains(s.SiteId))
+            .Select(s => s.SiteId)
+            .ToListAsync();
+
+        if (validSites.Count != request.Site.Count)
+            return BadRequest("Invalid SiteId found.");
+
+        var validRoles = await _db.Roles
+            .Where(r => request.Role.Contains(r.RoleId))
+            .Select(r => r.RoleId)
+            .ToListAsync();
+
+        if (validRoles.Count != request.Role.Count)
+            return BadRequest("Invalid RoleId found.");
+
+        var existingMappings = await _db.UserSiteRoles
+            .Where(x => x.UserId == userId)
+            .ToListAsync();
+
+        _db.UserSiteRoles.RemoveRange(existingMappings);
+
+        for (int i = 0; i < validSites.Count; i++)
         {
-            bool roleExists = await _db.Roles
-                .AnyAsync(r => r.RoleId == request.RoleId.Value);
-
-            if (!roleExists)
-                return BadRequest("Invalid RoleId.");
-
-            var userSiteRole = await _db.UserSiteRoles
-                .FirstOrDefaultAsync(x => x.UserId == userId && x.SiteId == siteId);
-
-            if (userSiteRole == null)
-                return NotFound("User does not have a role assigned for this site.");
-
-            userSiteRole.RoleId = request.RoleId.Value;
+            _db.UserSiteRoles.Add(new UserSiteRole
+            {
+                UserSiteRoleId = Guid.NewGuid(),
+                UserId = userId,
+                SiteId = validSites[i],
+                RoleId = i < validRoles.Count ? validRoles[i] : validRoles.First(),
+                IsActive = true,
+                AssignedAt = DateTime.UtcNow
+            });
         }
 
         await _db.SaveChangesAsync();
 
         return Ok(new
         {
-            user.UserId,
-            user.UserName,
-            user.Email,
-            user.PhoneNo,
-            SiteId = siteId,
-            RoleId = request.RoleId
+            Message = "User updated successfully",
+            UserId = user.UserId
         });
     }
-
 
     private string HashPassword(string password)
     {
