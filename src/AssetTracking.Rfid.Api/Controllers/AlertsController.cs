@@ -19,17 +19,22 @@ public class AlertsController : ControllerBase
         _db = db;
     }
 
-    [AllowAnonymous]
+    [AllowAnonymous] // remove later if needed
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Alert>>> GetAll()
+    public async Task<ActionResult<IEnumerable<Alert>>> GetAll([FromQuery] Guid siteId)
     {
+        if (siteId == Guid.Empty)
+            return BadRequest("siteId is required");
+
         var list = await _db.Alerts
+            .Where(a => a.SiteId == siteId)
             .OrderByDescending(a => a.Timestamp)
             .Take(100)
             .ToListAsync();
 
         return Ok(list);
     }
+
 
     [AllowAnonymous]
     [HttpPost("{id:guid}/resolve")]

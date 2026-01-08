@@ -252,10 +252,6 @@ public class EquipmentController : ControllerBase
             RecentlyClearedToday = recentlyClearedToday
         };
 
-<<<<<<< Updated upstream
-        // Always return response, counts will be 0 if no records
-=======
->>>>>>> Stashed changes
         return Ok(response);
     }
 
