@@ -29,5 +29,6 @@ public class Alert
     public DateTime? ResolvedAt { get; set; }
 
     [Column("site_id")]
-    public int SiteId { get; set; }
+    public Guid SiteId { get; set; }
+    public Site? Site { get; set; }
 }

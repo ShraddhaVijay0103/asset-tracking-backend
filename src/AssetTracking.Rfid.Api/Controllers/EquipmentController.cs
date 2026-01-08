@@ -87,6 +87,23 @@ public class EquipmentController : ControllerBase
                     };
 
         var result = await query.AsNoTracking().ToListAsync();
+        if (!result.Any())
+        {
+            result.Add(new
+            {
+                MissingEquipmentCaseId = Guid.Empty,
+                Equipment_Id = Guid.Empty,
+                Equipment_Name = "N/A",
+                Truck = "N/A",
+                Driver = "N/A",
+                Site_Name = "N/A",
+                Status_Id = 0,
+                Status = "N/A",
+                Severity = "N/A",
+                Opened_At = DateTimeOffset.MinValue,
+                lastSeen = (DateTimeOffset?)null
+            });
+        }
 
         return Ok(result);
     }
@@ -235,7 +252,10 @@ public class EquipmentController : ControllerBase
             RecentlyClearedToday = recentlyClearedToday
         };
 
+<<<<<<< Updated upstream
         // Always return response, counts will be 0 if no records
+=======
+>>>>>>> Stashed changes
         return Ok(response);
     }
 

@@ -250,10 +250,18 @@ public class TrucksController : ControllerBase
             var truckId = truck.TruckId;
 
             var truckPresent = await _db.GateEvents
+<<<<<<< Updated upstream
                 .AnyAsync(g => g.TruckId == truck.TruckId && g.SiteId == siteId);
 
             if (!truckPresent)
                 continue;
+=======
+                 .AnyAsync(g => g.TruckId == truck.TruckId && g.SiteId == siteId);
+
+            if (!truckPresent)
+                continue;
+
+>>>>>>> Stashed changes
             // ================= 1. GET TRUCK TEMPLATES =================
             var templates = await _db.TruckEquipmentTemplates
                 .Where(t => t.TruckId == truckId && t.SiteId == siteId)
@@ -306,7 +314,10 @@ public class TrucksController : ControllerBase
             }
 
             // ================= 5. BUILD CHECK-OUT TABLE =================
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
             var checkoutTable = entryEquipment.Select(e => new
             {
                 Equipment = e.Name,
@@ -314,16 +325,28 @@ public class TrucksController : ControllerBase
                 Detected = "✓",
                 EquipmentId = e.EquipmentId
             }).ToList();
+<<<<<<< Updated upstream
 
             var checkOutSummary = new
             {
                 totalRequired = checkoutTable.Count,
                 totalAssigned = entryEquipment.Count
             };
+=======
+>>>>>>> Stashed changes
 
+            var checkOutSummary = new
+            {
+                totalRequired = checkoutTable.Count,
+                totalAssigned = entryEquipment.Count
+            };
             // ================= 6. BUILD CHECK-IN TABLE =================
+<<<<<<< Updated upstream
             //var checkinTable = new List<object>();
 
+=======
+          
+>>>>>>> Stashed changes
             var checkinTable = exitEquipment.Select(e => new
             {
                 Equipment = e.Name,

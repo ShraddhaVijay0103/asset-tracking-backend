@@ -49,6 +49,7 @@ public class ScanDataProcessorFunction
 
         var since = now.AddMinutes(-lookbackMinutes);
 
+
         _logger.LogInformation("ScanDataProcessor started at {Time}, lookback: {Since}", now, since);
 
         // 1) Load unprocessed scans in lookback window
@@ -66,16 +67,23 @@ public class ScanDataProcessorFunction
 
         _logger.LogInformation("Found {Count} unprocessed scans.", scans.Count);
 
-        //find truck maching by rfid tags
-
-
         // 2) Group into sessions: ReaderId + time window
         var sessions = GroupIntoSessions(scans, TimeSpan.FromSeconds(sessionWindowSeconds));
 
-        //// Load templates & rules just once
-        //var templates = await _db.TruckEquipmentTemplates
-        //    .Include(t => t.EquipmentType)
-        //    .ToListAsync();
+        // Load templates & rules just once
+        var templates = await _db.TruckEquipmentTemplates
+            .Include(t => t.EquipmentType)
+            .ToListAsync();
+        var siteIds = scans
+    .Select(s => Guid.Parse(s.SiteId))
+    .Distinct()
+    .ToList();
+
+        var sites = await _db.Sites
+            .Where(s => siteIds.Contains(s.SiteId))
+            .ToListAsync();
+
+        var SiteId = sites.FirstOrDefault()?.SiteId ?? Guid.Empty;
 
         var alertRules = await _db.AlertRules.FirstOrDefaultAsync()
             ?? new AlertRules
@@ -109,37 +117,39 @@ public class ScanDataProcessorFunction
             .ToListAsync();
         GateEvent? gate = null;
         // Process each session -> GateEvent + GateEventItems + Alerts
-        foreach (var session in sessions)
-        {
-             gate = await ProcessSessionAsync(session, equipmentByEpc, trucksByEpc, alertRules, now);
+        gate = await ProcessSessionAsync(
+      sessions,
+      equipmentByEpc,
+      trucksByEpc,
+      alertRules,
+      now,
+      SiteId
+  );
 
-        }
         await _db.SaveChangesAsync();
+
         // Mark scans as processed
         foreach (var scan in scans)
         {
             scan.ProcessedAt = now;
             if (gate != null)
             {
-                await HandleTruckEquipmentAssignmentAsync(scan.Epc,gate, now);
+                await HandleTruckEquipmentAssignmentAsync(scan.Epc, gate, now);
             }
-
         }
 
         await _db.SaveChangesAsync();
 
         // Late return / not returned alerts (truck left long ago but no return)
         await ProcessLateReturnAlertsAsync(alertRules, now);
-        
-        await _db.SaveChangesAsync();
-
 
         _logger.LogInformation("ScanDataProcessor finished at {Time}", DateTime.UtcNow);
     }
+
     private async Task HandleTruckEquipmentAssignmentAsync(
-    string epc,
-    GateEvent gate,
-    DateTime now)
+   string epc,
+   GateEvent gate,
+   DateTime now)
     {
         // Load GateEventItems to know which equipment was scanned
         var gateEventItems = await _db.GateEventItems
@@ -170,7 +180,8 @@ public class ScanDataProcessorFunction
                     TruckId = gate.TruckId,
                     EquipmentId = item.EquipmentId,
                     AssignedAt = now,
-                    ReturnedAt = null
+                    ReturnedAt = null,
+                    SiteId = gate.SiteId
                 };
 
                 _db.TruckEquipmentAssignments.Add(assignment);
@@ -196,17 +207,43 @@ public class ScanDataProcessorFunction
 
         await _db.SaveChangesAsync();
     }
+    private async Task<string> AssignEventTypesAsync(ScanSession session, Guid truckId)
+    {
+        // Get the event type for this single session
+        var eventType = await ResolveEventTypeAsync(session, truckId);
+        return eventType;
+    }
+
+
+    private async Task<string> ResolveEventTypeAsync(
+    ScanSession session,
+    Guid truckId)
+    {
+        // 1️⃣ Try Reader configuration first
+        var reader = await _db.Readers
+            .FirstOrDefaultAsync(r => r.ReaderId.ToString() == session.ReaderId);
+
+        if (!string.IsNullOrWhiteSpace(reader?.Direction))
+            return reader.Direction;
+
+        // 2️⃣ Fallback: infer from last GateEvent
+        var lastEvent = await _db.GateEvents
+            .Where(g => g.TruckId == truckId)
+            .OrderByDescending(g => g.EventTime)
+            .Select(g => g.EventType)
+            .FirstOrDefaultAsync();
+
+        // 3️⃣ Infer
+        return lastEvent == "Entry" ? "Exit" : "Entry";
+    }
 
     /// <summary>
     /// Group raw scans into reader-based time sessions (one truck crossing).
     /// </summary>
-    private List<ScanSession> GroupIntoSessions(
-        List<RfidScan> scans,
-        TimeSpan window)
+    private List<ScanSession> GroupIntoSessions(List<RfidScan> scans, TimeSpan window)
     {
         var sessions = new List<ScanSession>();
 
-        // Group first by reader
         foreach (var group in scans.GroupBy(s => s.ReaderId))
         {
             ScanSession? current = null;
@@ -255,6 +292,7 @@ public class ScanDataProcessorFunction
         return sessions;
     }
 
+
     /// <summary>
     /// Process a single gate session:
     /// - Map EPCs to Equipment
@@ -263,24 +301,546 @@ public class ScanDataProcessorFunction
     /// - Exit (Check-Out): compare against expected template (kit) and raise missing alerts
     /// - Entry (Check-In): compare with last Exit to detect items not returned
     /// </summary>
-    private static (decimal Min, decimal? Max) ParseCostRange(string costRange)
+    private async Task<GateEvent?> ProcessSessionAsync(
+       List<ScanSession> session,
+      List<Equipment> equipmentByEpc,
+      List<Truck> trucksByEpc,
+      AlertRules alertRules,
+      DateTime now, Guid SiteId)
+    {
+        // Map ALL EPCs from ALL sessions
+        var scannedEpcs = session
+      .SelectMany(s => s.Scans)
+      .Where(s => !string.IsNullOrWhiteSpace(s.Epc))
+      .Select(s => s.Epc.Trim())
+      .Distinct(StringComparer.OrdinalIgnoreCase)
+      .ToList();
+
+
+        // Map all scanned EPCs to Equipment
+        var scannedEquipment = equipmentByEpc
+            .Where(e => e.RfidTag != null && scannedEpcs.Contains(e.RfidTag.Epc.Trim()))
+            .ToList();
+
+
+
+        if (!scannedEquipment.Any())
+        {
+            // For now, ignore sessions with no known equipment
+            _logger.LogInformation("Session at reader {ReaderId} has no known equipment EPCs.", session.First().ReaderId);
+            return null;
+        }
+
+        // 1) Determine truck by best matching template (Southern Botanical standard kits)
+        var scannedTruck = trucksByEpc.FirstOrDefault(t =>
+              t.RfidTag != null &&
+              scannedEpcs.Contains(t.RfidTag.Epc.Trim()));
+        if (scannedTruck.TruckId == Guid.Empty)
+        {
+            _logger.LogWarning("No matching truck found for session at reader {ReaderId}.", session.First().ReaderId);
+            return null;
+        }
+
+        // Load truck + driver
+        var truck = await _db.Trucks
+            .Include(t => t.Driver)
+            .FirstOrDefaultAsync(t => t.TruckId == scannedTruck.TruckId);
+
+        if (truck == null)
+        {
+            _logger.LogWarning("Truck {TruckId} not found in DB.", scannedTruck);
+            return null;
+        }
+        var template = await _db.TruckEquipmentTemplates
+           .FirstOrDefaultAsync(t => t.TruckId == scannedTruck.TruckId);
+        if (template == null)
+        {
+            _logger.LogWarning("No template found for Truck {TruckId}", scannedTruck.TruckId);
+            return null;
+        }
+        // 2) Determine event type (Entry vs Exit) from Reader.Direction
+        // NOTE: RfidScan.ReaderId is string; we assume it stores Reader.ReaderId.ToString()
+        var eventType = await AssignEventTypesAsync(session.First(), truck.TruckId);
+        if (string.IsNullOrWhiteSpace(eventType))
+        {
+            // Default to Exit if not configured
+            eventType = "Exit";
+        }
+        var reader = await _db.Readers
+            .FirstOrDefaultAsync(r => r.ReaderId.ToString() == session.First().ReaderId);
+        // 3) Create GateEvent
+        var gateEvent = new GateEvent
+        {
+            GateEventId = Guid.NewGuid(),
+            TruckId = truck.TruckId,
+            DriverId = truck.DriverId,
+            ReaderId = reader?.ReaderId ?? Guid.Empty,
+            EventTime = session.First().End,
+            EventType = eventType!,
+            Status = "Pending",
+            SiteId = SiteId,
+            Notes = $"Auto-generated from RfidScans at {session.First().End:u}"
+        };
+
+        _db.GateEvents.Add(gateEvent);
+
+        // 4) Create GateEventItems (what we actually saw at the gate)
+        foreach (var eq in scannedEquipment)
+        {
+            var tag = eq.RfidTag!;
+            var item = new GateEventItem
+            {
+                GateEventItemId = Guid.NewGuid(),
+                GateEventId = gateEvent.GateEventId,
+                EquipmentId = eq.EquipmentId,
+                SiteId = SiteId,
+                Epc = tag.Epc
+            };
+            _db.GateEventItems.Add(item);
+        }
+
+        // Make EPC sets for comparisons
+        var scannedEpcSet = scannedEquipment
+            .Where(e => e.RfidTag != null)
+            .Select(e => e.RfidTag!.Epc)
+            .Distinct()
+            .ToHashSet();
+
+        // 5) Exit (Check-Out) logic – detect incomplete kits at morning departure
+        if (string.Equals(eventType, "Exit", StringComparison.OrdinalIgnoreCase))
+        {
+            var expectedEquipmentIds = new List<Guid>
+{
+    template.EquipmentTypeId
+};
+
+            var expectedEpcs = (await _db.Equipment
+                    .Include(e => e.RfidTag)
+                    .Where(e =>
+                        expectedEquipmentIds.Contains(e.EquipmentTypeId) &&
+                        e.RfidTag != null)
+                    .Select(e => e.RfidTag!.Epc.Trim())
+                    .ToListAsync())
+                .ToHashSet();
+
+            var missingEpcs = expectedEpcs
+                .Except(scannedEpcSet)
+                .ToList();
+
+            if (!missingEpcs.Any())
+            {
+                await _db.SaveChangesAsync();
+                return gateEvent;
+            }
+            var missingEquipmentCosts = await _db.Equipment
+               .Include(e => e.RfidTag)
+               .Where(e => e.RfidTag != null && missingEpcs.Contains(e.RfidTag.Epc))
+               .Select(e => new
+               {
+                   e.EquipmentId,
+                   e.RfidTag!.Epc,
+                   Cost = e.cost
+               })
+               .ToListAsync();
+            var totalMissingCost = missingEquipmentCosts.Sum(x => x.Cost);
+
+            var severities = await _db.MissingEquipmentSeverities
+      .Select(s => new
+      {
+          s.SeverityId,
+          s.Code,
+          s.Cost // range string
+      })
+      .ToListAsync();
+
+            var matchedSeverity = severities
+                .Select(s =>
+                {
+                    var range = ParseCostRange(s.Cost);
+
+                    return new
+                    {
+                        s.SeverityId,
+                        s.Code,
+                        Min = range.Min.HasValue ? (decimal?)range.Min.Value : null,
+                        Max = range.Max.HasValue ? (decimal?)range.Max.Value : null
+                    };
+                })
+                .Where(r =>
+                    totalMissingCost >= r.Min &&
+                    (r.Max == null || totalMissingCost <= r.Max))
+                .OrderByDescending(r => r.Min)
+                .FirstOrDefault();
+
+            if (matchedSeverity == null)
+            {
+                throw new Exception($"No severity found for cost {totalMissingCost}");
+            }
+
+            var severityId = matchedSeverity.SeverityId;
+            // -------- Alert --------
+            if (missingEpcs.Count >= alertRules.MissingItemThreshold)
+            {
+                _db.Alerts.Add(new Alert
+                {
+                    AlertId = Guid.NewGuid(),
+                    Timestamp = now,
+                    Message =
+                        $"{missingEpcs.Count} equipment item(s) missing for truck {truck.TruckNumber} during CHECK-OUT at reader {reader?.Name}. Driver: {truck.Driver?.FullName ?? "(unassigned)"}",
+                    Severity = matchedSeverity.Code,
+                    Source = "GateEvent",
+                    SiteId = reader.SiteId,
+                    IsResolved = false
+                });
+            }
+           
+
+            // -------- Missing Case --------
+            var openStatusId = await _db.MissingEquipmentStatuses
+                .Where(s => s.Code == "Open")
+                .Select(s => s.StatusId)
+                .SingleAsync();
+
+            var existingCase = await _db.MissingEquipmentCases
+                .Include(c => c.Items)
+                .FirstOrDefaultAsync(c =>
+                    c.TruckId == truck.TruckId &&
+                    c.StatusId == openStatusId);
+
+            if (existingCase == null)
+            {
+                existingCase = new MissingEquipmentCase
+                {
+                    MissingEquipmentCaseId = Guid.NewGuid(),
+                    TruckId = truck.TruckId,
+                    DriverId = truck.DriverId,
+                    SiteId = reader.SiteId,
+                    OpenedAt = now,
+                    LastSeenAt = now,
+                    StatusId = openStatusId,
+
+                    // ✅ REQUIRED (FK)
+                    SeverityId = matchedSeverity.SeverityId,
+                    Items = new List<MissingEquipmentCaseItem>()
+                };
+
+                _db.MissingEquipmentCases.Add(existingCase);
+            }
+            else
+            {
+                existingCase.LastSeenAt = now;
+            }
+            foreach (var epc in missingEpcs)
+            {
+                // Skip if the EPC is already in existing case
+                if (existingCase.Items.Any(i => i.Epc == epc))
+                    continue;
+
+                // Get EquipmentId for this EPC
+                var equipmentId = await _db.Equipment
+                    .Where(e => e.RfidTag != null && e.RfidTag.Epc == epc)
+                    .Select(e => e.EquipmentId)
+                    .FirstOrDefaultAsync();
+
+                // Skip if EquipmentId not found
+                if (equipmentId == Guid.Empty)
+                    continue;
+
+                // Add new item to case
+                existingCase.Items.Add(new MissingEquipmentCaseItem
+                {
+                    MissingEquipmentCaseItemId = Guid.NewGuid(),
+                    MissingEquipmentCaseId = existingCase.MissingEquipmentCaseId,
+                    EquipmentId = equipmentId,
+                    Epc = epc,
+                    IsRecovered = false,
+                    SiteId = reader.SiteId
+                });
+            }
+
+            await _db.SaveChangesAsync();
+        }
+        else if (string.Equals(eventType, "Entry", StringComparison.OrdinalIgnoreCase))
+        {
+            var lastExit = await _db.GateEvents
+                .Include(g => g.Items)
+                .Where(g => g.TruckId == truck.TruckId
+                            && g.EventType == "Exit"
+                            && g.EventTime <= gateEvent.EventTime)
+                .OrderByDescending(g => g.EventTime)
+                .FirstOrDefaultAsync();
+
+            if (lastExit == null)
+            {
+                _logger.LogInformation("Entry event for truck {Truck}, no previous Exit found.", truck.TruckNumber);
+                return gateEvent;
+            }
+
+            var exitMissingEpcs = lastExit.Items
+                .Select(i => i.Epc)
+                .Distinct()
+                .ToHashSet();
+
+            var stillMissingEpcs = exitMissingEpcs.Intersect(scannedEpcSet).ToList();
+
+            if (!stillMissingEpcs.Any())
+                return gateEvent;
+
+            var missingEquipNames = await _db.Equipment
+                .Include(e => e.RfidTag)
+                .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
+                .Select(e => e.Name)
+                .ToListAsync();
+
+            var missingList = string.Join(", ", missingEquipNames);
+
+            _db.Alerts.Add(new Alert
+            {
+                AlertId = Guid.NewGuid(),
+                Timestamp = now,
+                Message =
+                    $"Truck {truck.TruckNumber} (driver: {truck.Driver?.FullName ?? "(unassigned)"}) returned with {missingEquipNames.Count} missing item(s): {missingList}.",
+                Severity = "High",
+                Source = "GateEvent",
+                SiteId = reader.SiteId,
+                IsResolved = false
+            });
+            await _db.SaveChangesAsync();
+            await HandleMissingEquipmentAsync(
+                truck,
+                reader,
+                gateEvent,
+                stillMissingEpcs.ToHashSet(),
+                scannedEpcSet,
+                now);
+
+            await _db.SaveChangesAsync();
+        }
+        // -------------------- 14. Final Save --------------------
+        await _db.SaveChangesAsync();
+        return gateEvent;
+
+    }
+    private async Task HandleMissingEquipmentAsync(
+    Truck truck,
+    Reader? reader,
+    GateEvent gateEvent,
+    HashSet<string> stillMissingEpcs,
+    HashSet<string> scannedEpcs,
+    DateTime now)
+    {
+        var statuses = await _db.MissingEquipmentStatuses
+            .ToDictionaryAsync(s => s.Code, s => s.StatusId);
+
+        var closedStatusId = statuses["Closed"];
+        var openStatusId = statuses["Open"];
+        var recoveredStatusId = statuses["Recovered"];
+        var investigationStatusId = statuses["Investigation"];
+        var activeStatusIds = new[] { openStatusId, investigationStatusId };
+
+        // 1️⃣ Load affected cases and items
+        var affectedCases = await _db.MissingEquipmentCases
+            .Include(c => c.Items)
+            .Where(c =>
+                activeStatusIds.Contains(c.StatusId) &&
+                c.Items.Any(i => !i.IsRecovered && scannedEpcs.Contains(i.Epc)))
+            .ToListAsync();
+
+        var existingCase = await _db.MissingEquipmentCases
+            .Include(c => c.Items)
+            .FirstOrDefaultAsync(c =>
+                c.TruckId == truck.TruckId &&
+                c.StatusId != closedStatusId);
+
+        // 2️⃣ Update items in memory
+        foreach (var c in affectedCases)
+        {
+            foreach (var i in c.Items.Where(i => !i.IsRecovered && scannedEpcs.Contains(i.Epc)))
+            {
+                i.IsRecovered = true;
+                i.RecoveredAt = now;
+            }
+
+            if (c.Items.All(i => i.IsRecovered))
+            {
+                c.StatusId = closedStatusId;
+                c.ClosedAt = now;
+                c.LastSeenAt = now;
+            }
+        }
+
+        if (existingCase != null)
+        {
+            foreach (var i in existingCase.Items.Where(i => !i.IsRecovered && scannedEpcs.Contains(i.Epc)))
+            {
+                i.IsRecovered = true;
+                i.RecoveredAt = now;
+            }
+        }
+
+
+
+        // 3️⃣ Handle case if nothing missing
+        if (!stillMissingEpcs.Any())
+        {
+            if (existingCase != null)
+            {
+                existingCase.StatusId =
+                    existingCase.Items.All(i => i.IsRecovered)
+                        ? closedStatusId
+                        : recoveredStatusId;
+
+                existingCase.ClosedAt = now;
+                existingCase.LastSeenAt = now;
+            }
+
+            await SaveWithRetryAsync();
+            return;
+        }
+
+        // 4️⃣ Compute severity
+        var totalMissingCost = await _db.Equipment
+            .Include(e => e.RfidTag)
+            .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
+            .SumAsync(e => e.cost);
+
+        var severities = await _db.MissingEquipmentSeverities.ToListAsync();
+        var matchedSeverity = severities
+            .Select(s =>
+            {
+                var r = ParseCostRange(s.Cost);
+                return new
+                {
+                    s.SeverityId,
+                    s.Code,
+                    Min = r.Min.HasValue ? (decimal?)r.Min.Value : null,
+                    Max = r.Max.HasValue ? (decimal?)r.Max.Value : null
+                };
+            })
+            .Where(r => totalMissingCost >= r.Min &&
+                        (r.Max == null || totalMissingCost <= r.Max.Value))
+            .OrderByDescending(r => r.Min)
+            .FirstOrDefault()
+            ?? throw new Exception($"No severity found for cost {totalMissingCost}");
+
+        // 5️⃣ Create or escalate case
+        if (existingCase == null)
+        {
+            existingCase = new MissingEquipmentCase
+            {
+                MissingEquipmentCaseId = Guid.NewGuid(),
+                TruckId = truck.TruckId,
+                DriverId = truck.DriverId,
+                SiteId = reader?.SiteId ?? Guid.Empty,
+                StatusId = openStatusId,
+                SeverityId = matchedSeverity.SeverityId,
+                OpenedAt = now,
+                LastSeenAt = now,
+                Items = new List<MissingEquipmentCaseItem>()
+            };
+
+            _db.MissingEquipmentCases.Add(existingCase);
+        }
+        else
+        {
+            existingCase.StatusId = investigationStatusId;
+            existingCase.LastSeenAt = now;
+        }
+
+        // 6️⃣ Load missing equipment once
+        var missingEquipments = await _db.Equipment
+            .Include(e => e.RfidTag)
+            .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
+            .ToListAsync();
+
+        foreach (var eq in missingEquipments)
+        {
+            if (!existingCase.Items.Any(i => i.Epc == eq.RfidTag!.Epc))
+            {
+                existingCase.Items.Add(new MissingEquipmentCaseItem
+                {
+                    MissingEquipmentCaseItemId = Guid.NewGuid(),
+                    MissingEquipmentCaseId = existingCase.MissingEquipmentCaseId,
+                    EquipmentId = eq.EquipmentId,
+                    Epc = eq.RfidTag!.Epc,
+                    IsRecovered = false,
+                    SiteId = reader?.SiteId ?? Guid.Empty
+                });
+            }
+        }
+
+        // 7️⃣ Add alert if not exists
+        var alertExists = await _db.Alerts.AnyAsync(a =>
+            a.Source == "MissingEquipment" &&
+            a.Message.Contains(existingCase.MissingEquipmentCaseId.ToString()));
+
+        if (!alertExists)
+        {
+            _db.Alerts.Add(new Alert
+            {
+                AlertId = Guid.NewGuid(),
+                Timestamp = now,
+                Severity = matchedSeverity.Code,
+                Source = "MissingEquipment",
+                Message =
+                    $"Case {existingCase.MissingEquipmentCaseId}: Truck {truck.TruckNumber} missing items: " +
+                    string.Join(", ", missingEquipments.Select(e => e.Name)),
+                IsResolved = false,
+                SiteId = reader?.SiteId ?? Guid.Empty
+            });
+        }
+
+        // 8️⃣ Save **once** with retry
+        await SaveWithRetryAsync();
+
+        async Task SaveWithRetryAsync()
+        {
+            int attempts = 0;
+            bool saved = false;
+
+            while (!saved && attempts < 3)
+            {
+                try
+                {
+                    await _db.SaveChangesAsync();
+                    saved = true;
+                }
+                catch (DbUpdateConcurrencyException ex)
+                {
+                    attempts++;
+                    foreach (var entry in ex.Entries)
+                    {
+                        await entry.ReloadAsync(); // reload latest values
+                    }
+                    _logger.LogWarning("Concurrency conflict, retrying SaveChangesAsync.");
+                }
+            }
+
+            if (!saved)
+                throw new Exception("Failed to save after 3 concurrency retries");
+        }
+    }
+
+
+    private static (double? Min, double? Max) ParseCostRange(string costRange)
     {
         costRange = costRange.Replace("$", "").Trim();
 
-        // Example: "2001+"
+        // Handle "2001+"
         if (costRange.EndsWith("+"))
         {
-            var min = decimal.Parse(costRange.Replace("+", ""));
+            var min = double.Parse(costRange.Replace("+", ""));
             return (min, null);
         }
 
-        // Example: "1-100"
+        // Handle "1-100"
         var parts = costRange.Split('-');
         return (
-            decimal.Parse(parts[0]),
-            decimal.Parse(parts[1])
+            double.Parse(parts[0]),
+            double.Parse(parts[1])
         );
     }
+
     private static decimal ParseCost(string cost)
     {
         if (string.IsNullOrWhiteSpace(cost))
@@ -311,470 +871,43 @@ public class ScanDataProcessorFunction
             .SelectMany(x => Enumerable.Repeat(x.Epc, x.RequiredCount))
             .ToHashSet();
     }
-
-    private async Task<GateEvent?> ProcessSessionAsync(
-     ScanSession session,
-     List<Equipment> equipmentByEpc,
-     List<Truck> trucksByEpc,
-     AlertRules alertRules,
-     DateTime now)
-    {
-        // Map EPCs -> Equipment
-        var scannedEpcs = session.Scans.Select(s => s.Epc).Distinct().ToList();
-        var scannedEquipment = equipmentByEpc
-            .Where(e => e.RfidTag != null && scannedEpcs.Contains(e.RfidTag.Epc))
-            .ToList();
-
-        var scannedTruck = trucksByEpc
-            .Where(e => e.RfidTag != null && scannedEpcs.Contains(e.RfidTag.Epc))
-            .ToList();
-
-        if (!scannedEquipment.Any())
-        {
-            // For now, ignore sessions with no known equipment
-            _logger.LogInformation("Session at reader {ReaderId} has no known equipment EPCs.", session.ReaderId);
-            return null;
-        }
-
-        var scannedTruckIds = scannedTruck
-            .Select(t => t.TruckId)
-            .Distinct()
-            .ToList();
-
-        // Load templates & rules just once
-        var templates = await _db.TruckEquipmentTemplates
-            .Where(t => scannedTruckIds.Contains(t.TruckId))
-            .ToListAsync();
-
-        // 1) Determine truck by best matching template (Southern Botanical standard kits)
-        var bestTruckId = FindBestMatchingTruck(scannedEquipment, templates);
-        if (bestTruckId == Guid.Empty)
-        {
-            _logger.LogWarning("No matching truck found for session at reader {ReaderId}.", session.ReaderId);
-            return null;
-        }
-
-        // Load truck + driver
-        var truck = await _db.Trucks
-            .Include(t => t.Driver)
-            .FirstOrDefaultAsync(t => t.TruckId == bestTruckId);
-
-        if (truck == null)
-        {
-            _logger.LogWarning("Truck {TruckId} not found in DB.", bestTruckId);
-            return null;
-        }
-
-        // 2) Determine event type (Entry vs Exit) from Reader.Direction
-        // NOTE: RfidScan.ReaderId is string; we assume it stores Reader.ReaderId.ToString()
-        var readerIdString = session.ReaderId?.Trim();
-
-        if (!Guid.TryParse(readerIdString, out var readerId))
-        {
-            throw new InvalidOperationException($"Invalid ReaderId: {readerIdString}");
-        }
-
-        var reader = await _db.Readers.FirstOrDefaultAsync(r => r.ReaderId == readerId);
-
-        if (reader == null)
-        {
-            throw new InvalidOperationException($"Reader not found: {readerId}");
-        }
-
-        var eventType = reader?.Direction;
-        if (string.IsNullOrWhiteSpace(eventType))
-        {
-            // Default to Exit if not configured
-            eventType = "Exit";
-        }
-
-        // 3) Create GateEvent
-        var gateEvent = new GateEvent
-        {
-            GateEventId = Guid.NewGuid(),
-            TruckId = truck.TruckId,
-            DriverId = truck.DriverId,
-            ReaderId = reader?.ReaderId ?? Guid.Empty,
-            EventTime = session.End,
-            EventType = eventType!,
-            Status = "Pending",
-            Notes = $"Auto-generated from RfidScans at {session.End:u}"
-        };
-
-        _db.GateEvents.Add(gateEvent);
-
-        // 4) Create GateEventItems (what we actually saw at the gate)
-        foreach (var eq in scannedEquipment)
-        {
-            var tag = eq.RfidTag!;
-            var item = new GateEventItem
-            {
-                GateEventItemId = Guid.NewGuid(),
-                GateEventId = gateEvent.GateEventId,
-                EquipmentId = eq.EquipmentId,
-                Epc = tag.Epc
-            };
-            _db.GateEventItems.Add(item);
-        }
-
-        // Make EPC sets for comparisons
-        var scannedEpcSet = scannedEquipment
-            .Where(e => e.RfidTag != null)
-            .Select(e => e.RfidTag!.Epc)
-            .Distinct()
-            .ToHashSet();
-
-        // 5) Exit (Check-Out) logic – detect incomplete kits at morning departure
-        if (string.Equals(eventType, "Exit", StringComparison.OrdinalIgnoreCase))
-        {
-            // ---------- Status IDs ----------
-            var closedStatusId = await _db.MissingEquipmentStatuses
-                .Where(s => s.Code == "Closed")
-                .Select(s => s.StatusId)
-                .SingleAsync();
-
-            var openStatusId = await _db.MissingEquipmentStatuses
-                .Where(s => s.Code == "Open")
-                .Select(s => s.StatusId)
-                .SingleAsync();
-
-            // ---------- Existing open case ----------
-            var existingCase = await _db.MissingEquipmentCases
-                .Include(c => c.Items)
-                .FirstOrDefaultAsync(c =>
-                    c.TruckId == truck.TruckId &&
-                    c.StatusId != closedStatusId);
-
-            // ---------- Expected vs scanned ----------
-            var expectedEpcs = await GetExpectedEpcsAsync(truck.TruckId);
-
-            var missingEpcs = expectedEpcs
-                .Except(scannedEpcSet)
-                .ToHashSet();
-
-            if (!missingEpcs.Any())
-                return gateEvent;
-
-            // ---------- Load missing equipment cost ----------
-            var missingEquipmentCosts = await _db.Equipment
-                .Include(e => e.RfidTag)
-                .Where(e => e.RfidTag != null && missingEpcs.Contains(e.RfidTag.Epc))
-                .Select(e => new
-                {
-                    e.RfidTag!.Epc,
-                    Cost = e.cost
-                })
-                .ToListAsync();
-
-            var totalMissingCost = missingEquipmentCosts.Sum(x => x.Cost);
-
-            // ---------- Resolve severity ----------
-            var severities = await _db.MissingEquipmentSeverities 
-      .Select(s => new
-      {
-          s.SeverityId,
-          s.Cost // range string
-      })
-      .ToListAsync();
-
-            var matchedSeverity = severities
-                .Select(s =>
-                {
-                    var range = ParseCostRange(s.Cost);
-                    return new
-                    {
-                        s.SeverityId,
-                        range.Min,
-                        range.Max
-                    };
-                })
-                .Where(r =>
-                    totalMissingCost >= r.Min &&
-                    (r.Max == null || totalMissingCost <= r.Max))
-                .OrderByDescending(r => r.Min)
-                .FirstOrDefault();
-
-            if (matchedSeverity == null)
-            {
-                throw new Exception($"No severity found for cost {totalMissingCost}");
-            }
-
-            var severityId = matchedSeverity.SeverityId;
-
-            // ---------- Create or update case ----------
-            if (existingCase == null)
-            {
-                existingCase = new MissingEquipmentCase
-                {
-                    MissingEquipmentCaseId = Guid.NewGuid(),
-                    TruckId = truck.TruckId,
-                    DriverId = truck.DriverId,
-                    SiteId = reader.SiteId,
-                    OpenedAt = now,
-                    LastSeenAt = now,
-                    StatusId = openStatusId,
-                    SeverityId = matchedSeverity.SeverityId,
-                    Items = new List<MissingEquipmentCaseItem>()
-                };
-
-                _db.MissingEquipmentCases.Add(existingCase);
-            }
-            else
-            {
-                existingCase.LastSeenAt = now;
-                existingCase.SeverityId = matchedSeverity.SeverityId;
-            }
-
-            foreach (var epc in missingEpcs)
-            {
-                if (!existingCase.Items.Any(i => i.Epc == epc))
-                {
-                    existingCase.Items.Add(new MissingEquipmentCaseItem
-                    {
-                        MissingEquipmentCaseItemId = Guid.NewGuid(),
-                        MissingEquipmentCaseId = existingCase.MissingEquipmentCaseId,
-                        Epc = epc,
-                        IsRecovered = false
-                    });
-                }
-            }
-
-            return gateEvent;
-        }
-
-        // 6) Entry (Check-In) logic – compare with last Exit to find items not returned
-        else if (string.Equals(eventType, "Entry", StringComparison.OrdinalIgnoreCase))
-        {
-            // Find last Exit event for this truck BEFORE this Entry
-            var lastExit = await _db.GateEvents
-                .Include(g => g.Items)
-                .Where(g => g.TruckId == truck.TruckId
-                            && g.EventType == "Exit"
-                            && g.EventTime <= gateEvent.EventTime)
-                .OrderByDescending(g => g.EventTime)
-                .FirstOrDefaultAsync();
-
-            if (lastExit != null)
-            {
-                var exitEpcs = lastExit.Items
-                    .Select(i => i.Epc)
-                    .Distinct()
-                    .ToHashSet();
-
-                var stillMissingEpcs = exitEpcs.Except(scannedEpcSet).ToList();
-
-                if (stillMissingEpcs.Any())
-                {
-                    var missingEquipNames = await _db.Equipment
-                        .Include(e => e.RfidTag)
-                        .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
-                        .Select(e => e.Name)
-                        .ToListAsync();
-
-                    var missingList = string.Join(", ", missingEquipNames);
-
-                    var alert = new Alert
-                    {
-                        AlertId = Guid.NewGuid(),
-                        Timestamp = now,
-                        Message =
-                            $"Truck {truck.TruckNumber} (driver: {truck.Driver?.FullName ?? "(unassigned)"}) returned with {missingEquipNames.Count} missing item(s): {missingList}.",
-                        Severity = "High",
-                        Source = "GateEvent",
-                        IsResolved = false
-                    };
-                    _db.Alerts.Add(alert);
-
-                    _logger.LogWarning(
-                        "Entry event: truck {Truck}, driver {Driver}, missing {MissingCount} item(s): {MissingList}.",
-                        truck.TruckNumber,
-                        truck.Driver?.FullName,
-                        missingEquipNames.Count,
-                        missingList);
-                }
-                await HandleMissingEquipmentAsync(truck, reader, gateEvent, stillMissingEpcs.ToHashSet(), scannedEpcSet, now);
-
-                return gateEvent;
-            }
-            else
-            {
-                _logger.LogInformation(
-                    "Entry event for truck {TruckNumber}, but no previous Exit event found.",
-                    truck.TruckNumber);
-            }
-            return gateEvent;
-        }
-
-        // ✅ REQUIRED: covers Exit path and future event types
-        return gateEvent;
-    }
-
-    private async Task HandleMissingEquipmentAsync(Truck truck, Reader? reader, GateEvent gateEvent, HashSet<string> stillMissingEpcs, HashSet<string> scannedEpcs, DateTime now)
-    {
-        var closedStatusId = await _db.MissingEquipmentStatuses
-             .Where(s => s.Code == "Closed")
-             .Select(s => s.StatusId)
-             .SingleAsync();
-
-        var openStatusId = await _db.MissingEquipmentStatuses
-            .Where(s => s.Code == "Open")
-            .Select(s => s.StatusId)
-            .SingleAsync();
-
-        var recoveredStatusId = await _db.MissingEquipmentStatuses
-           .Where(s => s.Code == "Recovered")
-           .Select(s => s.StatusId)
-           .SingleAsync();
-
-        var investigationStatusId = await _db.MissingEquipmentStatuses
-           .Where(s => s.Code == "Investigation")
-           .Select(s => s.StatusId)
-           .SingleAsync();
-
-        // 1️⃣ Load existing open case (ONE per truck)
-        var existingCase = await _db.MissingEquipmentCases 
-            .Include(c => c.Items) 
-            .FirstOrDefaultAsync(c => c.TruckId == truck.TruckId && c.StatusId != closedStatusId); 
-        // 2️⃣ AUTO-RECOVER items that reappear
-        if (existingCase != null) {
-            foreach (var item in existingCase.Items 
-                .Where(i => !i.IsRecovered && scannedEpcs.Contains(i.Epc))) {
-                item.IsRecovered = true; item.RecoveredAt = now; } } 
-        // 3️⃣ If NOTHING missing → close case
-        if (!stillMissingEpcs.Any()) { if (existingCase != null) { 
-                if (existingCase.Items.All(i => i.IsRecovered)) { 
-                    existingCase.StatusId = closedStatusId; existingCase.ClosedAt = now; }
-                else { existingCase.StatusId = recoveredStatusId; } existingCase.LastSeenAt = now; }
-            await _db.SaveChangesAsync();
-            return; }
-        var missingEquipmentCosts = await _db.Equipment
-               .Include(e => e.RfidTag)
-               .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
-               .Select(e => new
-               {
-                   e.RfidTag!.Epc,
-                   Cost = e.cost
-               })
-               .ToListAsync();
-
-        var totalMissingCost = missingEquipmentCosts.Sum(x => x.Cost);
-
-        // ---------- Resolve severity ----------
-        var severities = await _db.MissingEquipmentSeverities
-  .Select(s => new
-  {
-      s.SeverityId,
-      s.Cost // range string
-  })
-  .ToListAsync();
-
-        var matchedSeverity = severities
-            .Select(s =>
-            {
-                var range = ParseCostRange(s.Cost);
-                return new
-                {
-                    s.SeverityId,
-                    range.Min,
-                    range.Max
-                };
-            })
-            .Where(r =>
-                totalMissingCost >= r.Min &&
-                (r.Max == null || totalMissingCost <= r.Max))
-            .OrderByDescending(r => r.Min)
-            .FirstOrDefault();
-
-        if (matchedSeverity == null)
-        {
-            throw new Exception($"No severity found for cost {totalMissingCost}");
-        }
-
-        var severityId = matchedSeverity.SeverityId;
-        // 4️⃣ Create case if NOT exists
-        if (existingCase == null) { 
-            existingCase = new MissingEquipmentCase 
-            {
-                MissingEquipmentCaseId = Guid.NewGuid(),
-                TruckId = truck.TruckId,
-                DriverId = truck.DriverId, 
-                SiteId = reader?.SiteId ?? Guid.Empty,
-                StatusId = openStatusId,
-                SeverityId = matchedSeverity.SeverityId,
-                OpenedAt = now,
-                LastSeenAt = now 
-            }; 
-            _db.MissingEquipmentCases.Add(existingCase); } else { 
-            // Escalate state
-            existingCase.StatusId = investigationStatusId; existingCase.LastSeenAt = now; } 
-        // 5️⃣ Load missing equipment
-        var missingEquipments = await _db.Equipment 
-            .Include(e => e.RfidTag) 
-            .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc)) 
-            .ToListAsync(); 
-        // 6️⃣ Add MissingEquipmentCaseItems (NO DUPLICATES)
-        foreach (var eq in missingEquipments) { 
-            if (!existingCase.Items.Any(i => i.Epc == eq.RfidTag!.Epc)) { 
-                existingCase.Items.Add(new MissingEquipmentCaseItem 
-                { MissingEquipmentCaseItemId = Guid.NewGuid(),
-                    MissingEquipmentCaseId = existingCase.MissingEquipmentCaseId,
-                    EquipmentId = eq.EquipmentId,
-                    Epc = eq.RfidTag!.Epc,
-                    IsRecovered = false }); } } 
-        // 7️⃣ Emit ALERT only ONCE
-        var alertExists = await _db.Alerts
-            .AnyAsync(a => a.Source == "MissingEquipment" && a.Message
-            .Contains(existingCase.MissingEquipmentCaseId.ToString()));
-        if (!alertExists) { 
-            var names = string.Join(", ", missingEquipments.Select(e => e.Name)); 
-            _db.Alerts.Add(new Alert { 
-                AlertId = Guid.NewGuid(),
-                Timestamp = now, 
-                Severity = "High",
-                Source = "MissingEquipment",
-                Message = $"Case {existingCase.MissingEquipmentCaseId}: Truck {truck.TruckNumber} missing items: {names}",
-                IsResolved = false }); 
-        } await _db.SaveChangesAsync();
-    }
-
-
     /// <summary>
     /// Choose best matching truck based on how many equipment types match its template.
     /// </summary>
-    private Guid FindBestMatchingTruck(
-        List<Equipment> scannedEquipment,
-        List<TruckEquipmentTemplate> templates)
-    {
-        if (!templates.Any())
-            return Guid.Empty;
+    //private Guid FindBestMatchingTruck(
+    //    List<Equipment> scannedEquipment,
+    //    List<TruckEquipmentTemplate> templates)
+    //{
+    //    if (!templates.Any())
+    //        return Guid.Empty;
 
-        var typeCounts = scannedEquipment
-            .GroupBy(e => e.EquipmentTypeId)
-            .ToDictionary(g => g.Key, g => g.Count());
+    //    var typeCounts = scannedEquipment
+    //        .GroupBy(e => e.EquipmentTypeId)
+    //        .ToDictionary(g => g.Key, g => g.Count());
 
-        var scores = templates
-            .GroupBy(t => t.TruckId)
-            .Select(g =>
-            {
-                var truckId = g.Key;
-                int score = 0;
-                foreach (var t in g)
-                {
-                    typeCounts.TryGetValue(t.EquipmentTypeId, out var scannedCount);
-                    // score = min(scannedCount, requiredCount) so better matches rank higher
-                    score += Math.Min(scannedCount, t.RequiredCount);
-                }
-                return new { TruckId = truckId, Score = score };
-            })
-            .OrderByDescending(x => x.Score)
-            .ToList();
+    //    var scores = templates
+    //        .GroupBy(t => t.TruckId)
+    //        .Select(g =>
+    //        {
+    //            var truckId = g.Key;
+    //            int score = 0;
+    //            foreach (var t in g)
+    //            {
+    //                typeCounts.TryGetValue(t.EquipmentTypeId, out var scannedCount);
+    //                // score = min(scannedCount, requiredCount) so better matches rank higher
+    //                score += Math.Min(scannedCount, t.RequiredCount);
+    //            }
+    //            return new { TruckId = truckId, Score = score };
+    //        })
+    //        .OrderByDescending(x => x.Score)
+    //        .ToList();
 
-        var best = scores.FirstOrDefault();
-        if (best == null || best.Score == 0)
-            return Guid.Empty;
+    //    var best = scores.FirstOrDefault();
+    //    if (best == null || best.Score == 0)
+    //        return Guid.Empty;
 
-        return best.TruckId;
-    }
+    //    return best.TruckId;
+    //}
 
     /// <summary>
     /// Late-return alerts: trucks that exited long ago but have no newer Entry event.
@@ -811,7 +944,8 @@ public class ScanDataProcessorFunction
                     Message = $"Truck {ge.TruckId} has not returned for more than {overdueMinutes} minutes (last exit at {ge.EventTime:u}).",
                     Severity = "Medium",
                     Source = "LateReturn",
-                    IsResolved = false
+                    IsResolved = false,
+                    SiteId = ge?.SiteId ?? Guid.Empty
                 };
                 _db.Alerts.Add(alert);
             }
@@ -828,17 +962,4 @@ public class ScanDataProcessorFunction
         public DateTime End { get; set; }
         public List<RfidScan> Scans { get; set; } = new();
     }
-}
-
-internal class MissingEquipmentCases
-{
-    public Guid MissingEquipmentCaseId { get; set; }
-    public Guid TruckId { get; set; }
-    public Guid? DriverId { get; set; }
-    public object SiteId { get; set; }
-    public DateTime OpenedAt { get; set; }
-    public DateTime LastSeenAt { get; set; }
-    public object Status { get; set; }
-    public object Severity { get; set; }
-    public List<MissingEquipmentCaseItem> Items { get; set; }
 }
