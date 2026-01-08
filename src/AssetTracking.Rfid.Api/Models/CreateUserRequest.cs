@@ -39,8 +39,7 @@ public class CreateUserRequest
     [Required]
     public Guid RoleId { get; set; }
 
-
-
+}
 
 public class UpdateUserRoleRequest
 {

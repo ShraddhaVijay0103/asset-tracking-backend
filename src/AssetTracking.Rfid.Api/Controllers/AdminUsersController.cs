@@ -1,13 +1,10 @@
-﻿using AssetTracking.Rfid.Api;
-using AssetTracking.Rfid.Api.Models;
+﻿using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
 
 namespace SouthernBotanical.Rfid.Api.Controllers;
 
