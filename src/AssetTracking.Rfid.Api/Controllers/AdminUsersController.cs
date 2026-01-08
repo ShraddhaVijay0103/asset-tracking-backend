@@ -146,19 +146,32 @@ public class AdminUsersController : ControllerBase
     }
 
     [AllowAnonymous]
-    [HttpPut("{userId}")]
+    [HttpPut("{userId:guid}")]
     public async Task<IActionResult> UpdateUser(
-      Guid userId,
-      [FromBody] UpdateUserMultiSiteRequest request)
+     Guid userId,
+     [FromBody] UpdateUserMultiSiteRequest request)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
         var user = await _db.Users
-            .FirstOrDefaultAsync(u => u.UserId == userId);
+            .FirstOrDefaultAsync(x => x.UserId == userId);
 
         if (user == null)
             return NotFound("User not found.");
+
+        /* ---------- USER FIELDS ---------- */
+
+        if (!string.IsNullOrWhiteSpace(request.UserName))
+        {
+            bool userNameExists = await _db.Users
+                .AnyAsync(u => u.UserName == request.UserName && u.UserId != userId);
+
+            if (userNameExists)
+                return BadRequest("Username already exists.");
+
+            user.UserName = request.UserName.Trim();
+        }
 
         if (!string.IsNullOrWhiteSpace(request.FirstName))
             user.FirstName = request.FirstName.Trim();
@@ -166,22 +179,10 @@ public class AdminUsersController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.LastName))
             user.LastName = request.LastName.Trim();
 
-        if (!string.IsNullOrWhiteSpace(request.UserName))
-            user.UserName = request.UserName.Trim();
-
         if (!string.IsNullOrWhiteSpace(request.PhoneNo))
             user.PhoneNo = request.PhoneNo.Trim();
 
-        if (!string.IsNullOrWhiteSpace(request.Email))
-        {
-            bool emailExists = await _db.Users
-                .AnyAsync(u => u.Email == request.Email && u.UserId != userId);
-
-            if (emailExists)
-                return BadRequest("Email already exists.");
-
-            user.Email = request.Email.Trim().ToLower();
-        }
+        /* ---------- PASSWORD ---------- */
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
@@ -191,13 +192,26 @@ public class AdminUsersController : ControllerBase
             user.Password = HashPassword(request.Password);
         }
 
+        // Ignore Email completely
+        // user.Email is never updated
+
+        user.UpdatedAt = DateTime.UtcNow;
+
+        /* ---------- SITE & ROLE ---------- */
+
+        if (request.Site == null || request.Site.Count == 0)
+            return BadRequest("At least one SiteId is required.");
+
+        if (request.Role == null || request.Role.Count == 0)
+            return BadRequest("At least one RoleId is required.");
+
         var validSites = await _db.Sites
             .Where(s => request.Site.Contains(s.SiteId))
             .Select(s => s.SiteId)
             .ToListAsync();
 
         if (validSites.Count != request.Site.Count)
-            return BadRequest("One or more SiteIds are invalid.");
+            return BadRequest("Invalid SiteId found.");
 
         var validRoles = await _db.Roles
             .Where(r => request.Role.Contains(r.RoleId))
@@ -205,38 +219,36 @@ public class AdminUsersController : ControllerBase
             .ToListAsync();
 
         if (validRoles.Count != request.Role.Count)
-            return BadRequest("One or more RoleIds are invalid.");
+            return BadRequest("Invalid RoleId found.");
 
-        var existingAssignments = await _db.UserSiteRoles
+        var existingMappings = await _db.UserSiteRoles
             .Where(x => x.UserId == userId)
             .ToListAsync();
-        _db.UserSiteRoles.RemoveRange(existingAssignments);
 
-        int siteCount = validSites.Count;
-        int roleCount = validRoles.Count;
+        _db.UserSiteRoles.RemoveRange(existingMappings);
 
-        for (int i = 0; i < siteCount; i++)
+        for (int i = 0; i < validSites.Count; i++)
         {
-            Guid currentSite = validSites[i];
-            Guid currentRole = i < roleCount ? validRoles[i] : validRoles.Last();
-
-            var userSiteRole = new UserSiteRole
+            _db.UserSiteRoles.Add(new UserSiteRole
             {
                 UserSiteRoleId = Guid.NewGuid(),
                 UserId = userId,
-                SiteId = currentSite,
-                RoleId = currentRole,
+                SiteId = validSites[i],
+                RoleId = i < validRoles.Count ? validRoles[i] : validRoles.First(),
                 IsActive = true,
                 AssignedAt = DateTime.UtcNow
-            };
-
-            _db.UserSiteRoles.Add(userSiteRole);
+            });
         }
 
         await _db.SaveChangesAsync();
 
-        return Ok(new { Message = "User updated successfully", userId = user.UserId });
+        return Ok(new
+        {
+            Message = "User updated successfully",
+            UserId = user.UserId
+        });
     }
+
 
     private string HashPassword(string password)
     {
