@@ -105,16 +105,9 @@ public class TrucksController : ControllerBase
 
     public class CreateTruckRequest
     {
-        [Required]
         public string TruckNumber { get; set; } = string.Empty;
-
-        [Required]
         public string DriverName { get; set; } = string.Empty;
-
-        [Required]
         public Guid SiteId { get; set; }
-
-        [Required]
         public Guid RfidTagId { get; set; }
     }
 
@@ -235,7 +228,8 @@ public class TrucksController : ControllerBase
     [HttpGet("drivers")]
     public async Task<ActionResult<IEnumerable<DriverRequest>>> GetDrivers()
     {
-        var drivers = await _db.Drivers
+        var driversWithoutTrucks = await _db.Drivers
+            .Where(d => !d.Trucks.Any())
             .Select(d => new DriverRequest
             {
                 userId = d.DriverId,
@@ -243,7 +237,7 @@ public class TrucksController : ControllerBase
             })
             .ToListAsync();
 
-        return Ok(drivers);
+        return Ok(driversWithoutTrucks);
     }
 
     [AllowAnonymous]
