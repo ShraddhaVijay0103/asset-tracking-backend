@@ -107,13 +107,13 @@ public class ScanDataProcessorFunction
 
         var trucksByEpc = await _db.Trucks
             .Include(t => t.RfidTag)          // needed to access EPC
-            .Where(t => t.RfidTag != null && epcs.Contains(t.RfidTag.Epc))
+            .Where(t => t.RfidTag != null && epcs.Contains(t.RfidTag.TagName))
             .ToListAsync();
 
         var equipmentByEpc = await _db.Equipment
             .Include(e => e.EquipmentType)
             .Include(e => e.RfidTag)
-            .Where(e => e.RfidTag != null && epcs.Contains(e.RfidTag.Epc))
+            .Where(e => e.RfidTag != null && epcs.Contains(e.RfidTag.TagName))
             .ToListAsync();
         GateEvent? gate = null;
         // Process each session -> GateEvent + GateEventItems + Alerts
@@ -319,7 +319,7 @@ public class ScanDataProcessorFunction
 
         // Map all scanned EPCs to Equipment
         var scannedEquipment = equipmentByEpc
-            .Where(e => e.RfidTag != null && scannedEpcs.Contains(e.RfidTag.Epc.Trim()))
+            .Where(e => e.RfidTag != null && scannedEpcs.Contains(e.RfidTag.TagName.Trim()))
             .ToList();
 
 
@@ -334,7 +334,7 @@ public class ScanDataProcessorFunction
         // 1) Determine truck by best matching template (Southern Botanical standard kits)
         var scannedTruck = trucksByEpc.FirstOrDefault(t =>
               t.RfidTag != null &&
-              scannedEpcs.Contains(t.RfidTag.Epc.Trim()));
+              scannedEpcs.Contains(t.RfidTag.TagName.Trim()));
         if (scannedTruck.TruckId == Guid.Empty)
         {
             _logger.LogWarning("No matching truck found for session at reader {ReaderId}.", session.First().ReaderId);
@@ -394,7 +394,7 @@ public class ScanDataProcessorFunction
                 GateEventId = gateEvent.GateEventId,
                 EquipmentId = eq.EquipmentId,
                 SiteId = SiteId,
-                Epc = tag.Epc
+                Epc = tag.TagName
             };
             _db.GateEventItems.Add(item);
         }
@@ -402,7 +402,7 @@ public class ScanDataProcessorFunction
         // Make EPC sets for comparisons
         var scannedEpcSet = scannedEquipment
             .Where(e => e.RfidTag != null)
-            .Select(e => e.RfidTag!.Epc)
+            .Select(e => e.RfidTag!.TagName)
             .Distinct()
             .ToHashSet();
 
@@ -419,7 +419,7 @@ public class ScanDataProcessorFunction
                     .Where(e =>
                         expectedEquipmentIds.Contains(e.EquipmentTypeId) &&
                         e.RfidTag != null)
-                    .Select(e => e.RfidTag!.Epc.Trim())
+                    .Select(e => e.RfidTag!.TagName.Trim())
                     .ToListAsync())
                 .ToHashSet();
 
@@ -434,11 +434,11 @@ public class ScanDataProcessorFunction
             }
             var missingEquipmentCosts = await _db.Equipment
                .Include(e => e.RfidTag)
-               .Where(e => e.RfidTag != null && missingEpcs.Contains(e.RfidTag.Epc))
+               .Where(e => e.RfidTag != null && missingEpcs.Contains(e.RfidTag.TagName))
                .Select(e => new
                {
                    e.EquipmentId,
-                   e.RfidTag!.Epc,
+                   e.RfidTag!.TagName,
                    Cost = e.cost
                })
                .ToListAsync();
@@ -538,7 +538,7 @@ public class ScanDataProcessorFunction
 
                 // Get EquipmentId for this EPC
                 var equipmentId = await _db.Equipment
-                    .Where(e => e.RfidTag != null && e.RfidTag.Epc == epc)
+                    .Where(e => e.RfidTag != null && e.RfidTag.TagName == epc)
                     .Select(e => e.EquipmentId)
                     .FirstOrDefaultAsync();
 
@@ -588,7 +588,7 @@ public class ScanDataProcessorFunction
 
             var missingEquipNames = await _db.Equipment
                 .Include(e => e.RfidTag)
-                .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
+                .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.TagName))
                 .Select(e => e.Name)
                 .ToListAsync();
 
@@ -701,7 +701,7 @@ public class ScanDataProcessorFunction
         // 4️⃣ Compute severity
         var totalMissingCost = await _db.Equipment
             .Include(e => e.RfidTag)
-            .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
+            .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.TagName))
             .SumAsync(e => e.cost);
 
         var severities = await _db.MissingEquipmentSeverities.ToListAsync();
@@ -750,19 +750,19 @@ public class ScanDataProcessorFunction
         // 6️⃣ Load missing equipment once
         var missingEquipments = await _db.Equipment
             .Include(e => e.RfidTag)
-            .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.Epc))
+            .Where(e => e.RfidTag != null && stillMissingEpcs.Contains(e.RfidTag.TagName))
             .ToListAsync();
 
         foreach (var eq in missingEquipments)
         {
-            if (!existingCase.Items.Any(i => i.Epc == eq.RfidTag!.Epc))
+            if (!existingCase.Items.Any(i => i.Epc == eq.RfidTag!.TagName))
             {
                 existingCase.Items.Add(new MissingEquipmentCaseItem
                 {
                     MissingEquipmentCaseItemId = Guid.NewGuid(),
                     MissingEquipmentCaseId = existingCase.MissingEquipmentCaseId,
                     EquipmentId = eq.EquipmentId,
-                    Epc = eq.RfidTag!.Epc,
+                    Epc = eq.RfidTag!.TagName,
                     IsRecovered = false,
                     SiteId = reader?.SiteId ?? Guid.Empty
                 });
@@ -862,13 +862,13 @@ public class ScanDataProcessorFunction
                   && e.RfidTag != null
             select new
             {
-                e.RfidTag!.Epc,
+                e.RfidTag!.TagName,
                 t.RequiredCount
             }
         ).ToListAsync();
 
         return rows
-            .SelectMany(x => Enumerable.Repeat(x.Epc, x.RequiredCount))
+            .SelectMany(x => Enumerable.Repeat(x.TagName, x.RequiredCount))
             .ToHashSet();
     }
     /// <summary>

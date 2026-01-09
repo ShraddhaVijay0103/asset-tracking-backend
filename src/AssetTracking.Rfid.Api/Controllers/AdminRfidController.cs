@@ -20,7 +20,7 @@ public class AdminRfidController : ControllerBase
 
     public class AssignTagRequest
     {
-        public string Epc { get; set; } = string.Empty;
+        public string TagName { get; set; } = string.Empty;
         public Guid EquipmentId { get; set; }
     }
 
@@ -28,13 +28,13 @@ public class AdminRfidController : ControllerBase
     [HttpPost("assign")]
     public async Task<ActionResult> AssignTag([FromBody] AssignTagRequest request)
     {
-        var tag = await _db.RfidTags.FirstOrDefaultAsync(t => t.Epc == request.Epc);
+        var tag = await _db.RfidTags.FirstOrDefaultAsync(t => t.TagName == request.TagName);
         if (tag == null)
         {
             tag = new RfidTag
             {
                 RfidTagId = Guid.NewGuid(),
-                Epc = request.Epc
+                TagName = request.TagName
             };
             _db.RfidTags.Add(tag);
         }
@@ -45,7 +45,7 @@ public class AdminRfidController : ControllerBase
         equipment.RfidTagId = tag.RfidTagId;
         await _db.SaveChangesAsync();
 
-        return Ok(new { equipment.EquipmentId, equipment.Name, TagEpc = tag.Epc });
+        return Ok(new { equipment.EquipmentId, equipment.Name, TagEpc = tag.TagName });
     }
 
     [AllowAnonymous]

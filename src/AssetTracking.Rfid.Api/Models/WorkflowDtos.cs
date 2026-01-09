@@ -2,7 +2,7 @@ namespace AssetTracking.Rfid.Api.Models;
 
 public class WorkflowScanItem
 {
-    public string Epc { get; set; } = string.Empty;
+    public string TagName { get; set; } = string.Empty;
     public double Rssi { get; set; }
 }
 
@@ -27,7 +27,7 @@ public class CheckinRequest
 
 public class WorkflowItemResult
 {
-    public string Epc { get; set; } = string.Empty;
+    public string TagName { get; set; } = string.Empty;
     public string? EquipmentName { get; set; }
     public string? EquipmentType { get; set; }
     public string Status { get; set; } = string.Empty; // Expected / Extra / Unknown / Missing

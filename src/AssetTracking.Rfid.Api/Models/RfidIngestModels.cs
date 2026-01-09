@@ -15,3 +15,9 @@ public class RfidEventBatch
     public string SiteId { get; set; } = string.Empty;
     public List<RfidEvent> Events { get; set; } = new();
 }
+
+public class RfidTagListResponse
+{
+    public Guid RfidTagId { get; set; }
+    public string Epc { get; set; }
+}

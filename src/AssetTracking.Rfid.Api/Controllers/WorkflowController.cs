@@ -58,11 +58,11 @@ public class WorkflowController : ControllerBase
         _db.GateEvents.Add(gateEvent);
 
         // Recognize scanned EPCs -> Equipment
-        var epcs = scanItems.Select(i => i.Epc).ToList();
+        var epcs = scanItems.Select(i => i.TagName).ToList();
         var equipmentByEpc = await _db.Equipment
             .Include(e => e.EquipmentType)
             .Include(e => e.RfidTag)
-            .Where(e => e.RfidTag != null && epcs.Contains(e.RfidTag.Epc))
+            .Where(e => e.RfidTag != null && epcs.Contains(e.RfidTag.TagName))
             .ToListAsync();
 
         var result = new WorkflowResult
@@ -74,7 +74,7 @@ public class WorkflowController : ControllerBase
         // Add GateEventItems for recognized equipment
         foreach (var scan in scanItems)
         {
-            var eq = equipmentByEpc.FirstOrDefault(e => e.RfidTag!.Epc == scan.Epc);
+            var eq = equipmentByEpc.FirstOrDefault(e => e.RfidTag!.TagName == scan.TagName);
             if (eq != null)
             {
                 var item = new GateEventItem
@@ -82,13 +82,13 @@ public class WorkflowController : ControllerBase
                     GateEventItemId = Guid.NewGuid(),
                     GateEventId = gateEvent.GateEventId,
                     EquipmentId = eq.EquipmentId,
-                    Epc = scan.Epc
+                    Epc = scan.TagName
                 };
                 _db.GateEventItems.Add(item);
 
                 result.Items.Add(new WorkflowItemResult
                 {
-                    Epc = scan.Epc,
+                    TagName = scan.TagName,
                     EquipmentName = eq.Name,
                     EquipmentType = eq.EquipmentType!.Name,
                     Status = "Expected" // may be updated below
@@ -98,7 +98,7 @@ public class WorkflowController : ControllerBase
             {
                 result.Items.Add(new WorkflowItemResult
                 {
-                    Epc = scan.Epc,
+                    TagName = scan.TagName,
                     EquipmentName = null,
                     EquipmentType = null,
                     Status = "Unknown"
@@ -134,7 +134,7 @@ public class WorkflowController : ControllerBase
             {
                 missingItems.Add(new WorkflowItemResult
                 {
-                    Epc = string.Empty,
+                    TagName = string.Empty,
                     EquipmentName = null,
                     EquipmentType = t.EquipmentType?.Name,
                     Status = "Missing"

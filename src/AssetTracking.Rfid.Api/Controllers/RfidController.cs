@@ -40,4 +40,22 @@ public class RfidController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(new { Count = batch.Events.Count });
     }
+
+    [AllowAnonymous]
+    [HttpGet("rfidtaglist/{siteId:guid}")]
+    public async Task<ActionResult<IEnumerable<RfidTagListResponse>>> GetRfidTagList(Guid siteId)
+    {
+        var list = await _db.RfidTags
+            .Where(r => r.SiteId == siteId && r.IsActive)
+            .Where(r => !_db.Trucks.Any(t => t.RfidTagId == r.RfidTagId))
+            .Select(r => new RfidTagListResponse
+            {
+                RfidTagId = r.RfidTagId,
+                Epc = r.TagName
+            })
+            .ToListAsync();
+
+        return Ok(list);
+    }
+
 }

@@ -18,7 +18,7 @@ public class TrucksController : ControllerBase
     {
         _db = db;
     }
-  
+
 
     [AllowAnonymous]
     [HttpGet("site/{siteId:guid}")]
@@ -28,12 +28,14 @@ public class TrucksController : ControllerBase
             .Where(t => t.SiteId == siteId)
             .Include(t => t.Site)
             .Include(t => t.Driver)
+            .Include(t => t.RfidTag)
             .Select(t => new TruckListResponse
             {
                 TruckId = t.TruckId,
                 TruckNumber = t.TruckNumber,
                 SiteName = t.Site.Name,
-                DriverName = t.Driver.FullName
+                DriverName = t.Driver.FullName,
+                RfIdTag = t.RfidTag.TagName
             })
             .ToListAsync();
 
@@ -104,6 +106,7 @@ public class TrucksController : ControllerBase
         public string TruckNumber { get; set; } = string.Empty;
         public string DriverName { get; set; } = string.Empty;
         public Guid SiteId { get; set; }
+        public Guid RfidTagId { get; set; }
     }
 
     [AllowAnonymous]
@@ -171,7 +174,8 @@ public class TrucksController : ControllerBase
             TruckNumber = request.TruckNumber,
             Description = string.Empty,
             DriverId = driver.DriverId,
-            SiteId = request.SiteId
+            SiteId = request.SiteId,
+            RfidTagId = request.RfidTagId
         };
 
         _db.Trucks.Add(truck);

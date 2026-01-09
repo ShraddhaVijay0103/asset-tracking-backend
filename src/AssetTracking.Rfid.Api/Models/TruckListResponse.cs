@@ -6,5 +6,6 @@
         public string TruckNumber { get; set; } = string.Empty;
         public string SiteName { get; set; } = string.Empty;
         public string DriverName { get; set; } = string.Empty;
+        public string RfIdTag { get; set; } = string.Empty;
     }
 }
