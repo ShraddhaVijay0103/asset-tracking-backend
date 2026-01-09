@@ -4,6 +4,7 @@ using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace AssetTracking.Rfid.Api.Controllers;
 
@@ -101,13 +102,22 @@ public class TrucksController : ControllerBase
 
         return Ok(list);
     }
+
     public class CreateTruckRequest
     {
+        [Required]
         public string TruckNumber { get; set; } = string.Empty;
+
+        [Required]
         public string DriverName { get; set; } = string.Empty;
+
+        [Required]
         public Guid SiteId { get; set; }
+
+        [Required]
         public Guid RfidTagId { get; set; }
     }
+
 
     [AllowAnonymous]
     [HttpPut("{id:guid}/assign")]
@@ -142,40 +152,54 @@ public class TrucksController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("create")]
-    public async Task<ActionResult<Truck>> CreateTruck([FromBody] CreateTruckRequest request)
+    public async Task<IActionResult> CreateTruck([FromBody] CreateTruckRequest request)
     {
-        // 1️⃣ Check duplicate truck number
-        var exists = await _db.Trucks
-            .AnyAsync(t => t.TruckNumber == request.TruckNumber);
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-        if (exists)
-            return BadRequest("Truck with this number already exists.");
+        // 1️⃣ Truck number must be unique
+        var truckExists = await _db.Trucks
+            .AnyAsync(t => t.TruckNumber.ToLower() == request.TruckNumber.ToLower());
 
-        // 2️⃣ Get or create driver
+        if (truckExists)
+            return BadRequest("Truck number already exists.");
+
+        // 2️⃣ Driver must exist
         var driver = await _db.Drivers
-            .FirstOrDefaultAsync(d => d.FullName == request.DriverName);
+            .FirstOrDefaultAsync(d => d.FullName.ToLower() == request.DriverName.ToLower());
 
         if (driver == null)
-        {
-            driver = new Driver
-            {
-                DriverId = Guid.NewGuid(),
-                FullName = request.DriverName
-            };
+            return BadRequest("Driver does not exist.");
 
-            _db.Drivers.Add(driver);
-            await _db.SaveChangesAsync(); // Save to get DriverId
+        // 3️⃣ RFID validation (OPTIONAL)
+        Guid? rfidTagId = null;
+
+        if (request.RfidTagId != Guid.Empty)
+        {
+            var rfidExists = await _db.RfidTags
+                .AnyAsync(r => r.RfidTagId == request.RfidTagId);
+
+            if (!rfidExists)
+                return BadRequest("RFID tag does not exist.");
+
+            var rfidInUse = await _db.Trucks
+                .AnyAsync(t => t.RfidTagId == request.RfidTagId);
+
+            if (rfidInUse)
+                return BadRequest("RFID tag is already assigned to another truck.");
+
+            rfidTagId = request.RfidTagId;
         }
 
-        // 3️⃣ Create truck
+        // 4️⃣ Create truck
         var truck = new Truck
         {
             TruckId = Guid.NewGuid(),
-            TruckNumber = request.TruckNumber,
+            TruckNumber = request.TruckNumber.Trim(),
             Description = string.Empty,
             DriverId = driver.DriverId,
             SiteId = request.SiteId,
-            RfidTagId = request.RfidTagId
+            RfidTagId = rfidTagId ?? Guid.Empty
         };
 
         _db.Trucks.Add(truck);
@@ -184,9 +208,10 @@ public class TrucksController : ControllerBase
         return Ok(new
         {
             message = "Truck created successfully",
-            truck
+            truckId = truck.TruckId
         });
     }
+
 
     [AllowAnonymous]
     [HttpGet("trucks")]
