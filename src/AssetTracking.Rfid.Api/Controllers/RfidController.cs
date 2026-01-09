@@ -48,6 +48,7 @@ public class RfidController : ControllerBase
         var list = await _db.RfidTags
             .Where(r => r.SiteId == siteId && r.IsActive)
             .Where(r => !_db.Trucks.Any(t => t.RfidTagId == r.RfidTagId))
+            .Where(r => !_db.Equipment.Any(t => t.RfidTagId == r.RfidTagId))
             .Select(r => new RfidTagListResponse
             {
                 RfidTagId = r.RfidTagId,
