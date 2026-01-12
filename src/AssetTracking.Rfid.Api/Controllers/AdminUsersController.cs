@@ -2,6 +2,7 @@
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -87,12 +88,33 @@ public class AdminUsersController : ControllerBase
             return BadRequest("At least one role must be provided.");
 
         var validRoles = await _db.Roles
-            .Where(r => request.Role.Contains(r.RoleId))
-            .Select(r => r.RoleId)
-            .ToListAsync();
+                    .Where(r => request.Role.Contains(r.RoleId))
+                    .Select(r => new
+                    {
+                        r.RoleId,
+                        r.Name
+                    })
+                    .ToListAsync();
 
         if (validRoles.Count != request.Role.Count)
             return BadRequest("One or more RoleIds are invalid.");
+
+        bool isDriver = validRoles.Any(r => r.Name == "Driver");
+
+        if (isDriver)
+        {
+            var driver = new Driver
+            {
+                DriverId = Guid.NewGuid(),
+                FullName = $"{request.FirstName} {request.LastName}",
+                Phone = request.PhoneNo,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _db.Drivers.Add(driver);
+        }
 
         var user = new User
         {
@@ -120,11 +142,11 @@ public class AdminUsersController : ControllerBase
 
             if (i < roleCount)
             {
-                currentRole = validRoles[i];
+                currentRole = validRoles[i].RoleId;
             }
             else
             {
-                currentRole = validRoles.Last();
+                currentRole = validRoles.Last().RoleId;
             }
 
             var userSiteRole = new UserSiteRole

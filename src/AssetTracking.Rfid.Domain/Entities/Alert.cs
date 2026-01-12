@@ -17,19 +17,18 @@ public class Alert
     [Column("message")]
     public string Message { get; set; } = string.Empty;
 
-    [Required]
     [Column("severity")]
-    public string Severity { get; set; } = "Medium"; // "High", "Medium", "Low"
+    public string Severity { get; set; } = "Medium";
 
-    [Required]
     [Column("source")]
-    public string Source { get; set; } = string.Empty; // e.g., "GateEvent", "Reader", "System"
+    public string Source { get; set; } = string.Empty;
 
     [Column("is_resolved")]
     public bool IsResolved { get; set; } = false;
 
     [Column("resolved_by_user")]
     public Guid? ResolvedByUser { get; set; }
+
     public User? ResolvedByUserNavigation { get; set; }
 
     [Column("resolved_at")]
@@ -37,5 +36,6 @@ public class Alert
 
     [Column("site_id")]
     public Guid SiteId { get; set; }
+
     public Site? Site { get; set; }
 }

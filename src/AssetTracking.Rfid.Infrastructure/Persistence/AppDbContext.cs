@@ -66,6 +66,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<MissingEquipmentSeverity>().HasKey(e => e.SeverityId);
         modelBuilder.Entity<MissingEquipmentStatus>().HasKey(e => e.StatusId);
         modelBuilder.Entity<UserSiteRole>().HasKey(e => e.UserSiteRoleId);
-
+        modelBuilder.Entity<Alert>()
+          .HasOne(a => a.ResolvedByUserNavigation)
+          .WithMany()
+          .HasForeignKey(a => a.ResolvedByUser)
+          .HasConstraintName("fk_alerts_resolved_by_user")
+          .OnDelete(DeleteBehavior.SetNull);
     }
 }
