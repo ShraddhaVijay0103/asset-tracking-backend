@@ -2,7 +2,6 @@
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -249,9 +248,13 @@ public class AdminUsersController : ControllerBase
             return BadRequest("Invalid SiteId found.");
 
         var validRoles = await _db.Roles
-            .Where(r => request.Role.Contains(r.RoleId))
-            .Select(r => r.RoleId)
-            .ToListAsync();
+                   .Where(r => request.Role.Contains(r.RoleId))
+                   .Select(r => new
+                   {
+                       r.RoleId,
+                       r.Name
+                   })
+                   .ToListAsync();
 
         if (validRoles.Count != request.Role.Count)
             return BadRequest("Invalid RoleId found.");
@@ -269,10 +272,44 @@ public class AdminUsersController : ControllerBase
                 UserSiteRoleId = Guid.NewGuid(),
                 UserId = userId,
                 SiteId = validSites[i],
-                RoleId = i < validRoles.Count ? validRoles[i] : validRoles.First(),
+                RoleId = i < validRoles.Count ? validRoles[i].RoleId : validRoles.First().RoleId,
                 IsActive = true,
                 AssignedAt = DateTime.UtcNow
             });
+        }
+
+        bool isDriver = validRoles.Any(r => r.Name == "Driver");
+
+        if (isDriver)
+        {
+            bool driverExists = await _db.Drivers
+                .AnyAsync(d => d.Phone == user.PhoneNo);
+
+            if (!driverExists)
+            {
+                var driver = new Driver
+                {
+                    DriverId = Guid.NewGuid(),
+                    FullName = $"{user.FirstName} {user.LastName}",
+                    Phone = user.PhoneNo,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _db.Drivers.Add(driver);
+            }
+        }
+        if (!isDriver)
+        {
+            var existingDriver = await _db.Drivers
+                .FirstOrDefaultAsync(d => d.Phone == user.PhoneNo);
+
+            if (existingDriver != null)
+            {
+                existingDriver.IsActive = false;
+                existingDriver.UpdatedAt = DateTime.UtcNow;
+            }
         }
 
         await _db.SaveChangesAsync();
