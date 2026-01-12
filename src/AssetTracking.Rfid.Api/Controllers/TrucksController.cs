@@ -228,7 +228,8 @@ public class TrucksController : ControllerBase
     [HttpGet("drivers")]
     public async Task<ActionResult<IEnumerable<DriverRequest>>> GetDrivers()
     {
-        var drivers = await _db.Drivers
+        var driversWithoutTrucks = await _db.Drivers
+            .Where(d => !d.Trucks.Any())
             .Select(d => new DriverRequest
             {
                 userId = d.DriverId,
@@ -236,7 +237,7 @@ public class TrucksController : ControllerBase
             })
             .ToListAsync();
 
-        return Ok(drivers);
+        return Ok(driversWithoutTrucks);
     }
 
     [AllowAnonymous]
