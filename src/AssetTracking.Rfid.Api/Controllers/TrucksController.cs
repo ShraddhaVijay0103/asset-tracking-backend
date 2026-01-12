@@ -105,16 +105,9 @@ public class TrucksController : ControllerBase
 
     public class CreateTruckRequest
     {
-        [Required]
         public string TruckNumber { get; set; } = string.Empty;
-
-        [Required]
         public string DriverName { get; set; } = string.Empty;
-
-        [Required]
         public Guid SiteId { get; set; }
-
-        [Required]
         public Guid RfidTagId { get; set; }
     }
 
