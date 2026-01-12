@@ -111,34 +111,46 @@ public class TrucksController : ControllerBase
         public Guid RfidTagId { get; set; }
     }
 
+    public class AssignTruckRequest
+    {
+        public Guid TruckId { get; set; }
+        public Guid DriverId { get; set; }
+        public Guid SiteId { get; set; }
+    }
 
     [AllowAnonymous]
-    [HttpPut("{id:guid}/assign")]
-    public async Task<ActionResult> AddTemplate(Guid id, [FromBody] CreateTruckRequest request)
+    [HttpPut("{truckId:guid}/assign")]
+    public async Task<ActionResult> AssignTruck(Guid truckId, [FromBody] AssignTruckRequest request)
     {
-        // 1️⃣ Get existing truck
+        if (truckId != request.TruckId)
+        {
+            return BadRequest("Route TruckId does not match request body TruckId.");
+        }
+
         var truck = await _db.Trucks
-                             .FirstOrDefaultAsync(t => t.TruckId == id);
+                             .FirstOrDefaultAsync(t => t.TruckId == truckId);
 
         if (truck == null)
         {
-            return NotFound($"Truck with ID {id} not found");
+            return NotFound($"Truck with ID {truckId} not found.");
         }
-        var driver = await _db.Drivers
-                             .FirstOrDefaultAsync(t => t.FullName == request.DriverName);
 
-        // 2️⃣ Update fields from request
-        truck.TruckNumber = request.TruckNumber;
-        truck.DriverId = driver.DriverId;
+        var driver = await _db.Drivers
+                              .FirstOrDefaultAsync(d => d.DriverId == request.DriverId);
+
+        if (driver == null)
+        {
+            return NotFound($"Driver with ID {request.DriverId} not found.");
+        }
+
+        truck.DriverId = request.DriverId;
         truck.SiteId = request.SiteId;
 
-        // 3️⃣ Save changes (NO Add)
-        _db.Trucks.Update(truck);
         await _db.SaveChangesAsync();
 
         return Ok(new
         {
-            message = "Truck updated successfully",
+            message = "Truck assigned successfully",
             truck
         });
     }
