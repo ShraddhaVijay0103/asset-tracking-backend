@@ -241,7 +241,7 @@ public class TrucksController : ControllerBase
     public async Task<ActionResult<IEnumerable<DriverRequest>>> GetDrivers()
     {
         var driversWithoutTrucks = await _db.Drivers
-            .Where(d => !d.Trucks.Any())
+        .Where(d => !d.Trucks.Any() && !d.IsActive)
             .Select(d => new DriverRequest
             {
                 userId = d.DriverId,
