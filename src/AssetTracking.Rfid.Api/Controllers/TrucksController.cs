@@ -219,14 +219,15 @@ public class TrucksController : ControllerBase
 
 
     [AllowAnonymous]
-    [HttpGet("trucks")]
-    public async Task<ActionResult<IEnumerable<Truck>>> GetTruck()
+    [HttpGet("{siteId:guid}/trucks")]
+    public async Task<ActionResult<IEnumerable<Truck>>> GetTrucks(Guid siteId)
     {
-        var list = await _db.Trucks
-            .OrderBy(r => r.TruckNumber)
+        var trucks = await _db.Trucks
+            .Where(t => t.SiteId == siteId)
+            .OrderBy(t => t.TruckNumber)
             .ToListAsync();
 
-        return Ok(list);
+        return Ok(trucks);
     }
 
     public class DriverRequest
@@ -237,11 +238,13 @@ public class TrucksController : ControllerBase
     }
 
     [AllowAnonymous]
-    [HttpGet("drivers")]
-    public async Task<ActionResult<IEnumerable<DriverRequest>>> GetDrivers()
+    [HttpGet("{siteId:guid}/drivers")]
+    public async Task<ActionResult<IEnumerable<DriverRequest>>> GetDrivers(Guid siteId)
     {
         var driversWithoutTrucks = await _db.Drivers
-        .Where(d => !d.Trucks.Any() && !d.IsActive)
+            .Where(d =>
+                d.IsActive &&
+                !d.Trucks.Any(t => t.SiteId == siteId))
             .Select(d => new DriverRequest
             {
                 userId = d.DriverId,
