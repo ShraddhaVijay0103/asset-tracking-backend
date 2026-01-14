@@ -115,7 +115,6 @@ public class TrucksController : ControllerBase
     {
         public Guid TruckId { get; set; }
         public Guid DriverId { get; set; }
-        public Guid SiteId { get; set; }
     }
 
     [AllowAnonymous]
@@ -144,7 +143,6 @@ public class TrucksController : ControllerBase
         }
 
         truck.DriverId = request.DriverId;
-        truck.SiteId = request.SiteId;
 
         await _db.SaveChangesAsync();
 
@@ -168,13 +166,6 @@ public class TrucksController : ControllerBase
 
         if (truckExists)
             return BadRequest("Truck number already exists.");
-
-        // 2️⃣ Driver must exist
-        var driver = await _db.Drivers
-            .FirstOrDefaultAsync(d => d.FullName.ToLower() == request.DriverName.ToLower());
-
-        if (driver == null)
-            return BadRequest("Driver does not exist.");
 
         // 3️⃣ RFID validation (OPTIONAL)
         Guid? rfidTagId = null;
@@ -202,7 +193,6 @@ public class TrucksController : ControllerBase
             TruckId = Guid.NewGuid(),
             TruckNumber = request.TruckNumber.Trim(),
             Description = string.Empty,
-            DriverId = driver.DriverId,
             SiteId = request.SiteId,
             RfidTagId = rfidTagId ?? Guid.Empty
         };
