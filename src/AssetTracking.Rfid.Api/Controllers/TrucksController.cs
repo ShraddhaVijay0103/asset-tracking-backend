@@ -335,31 +335,33 @@ public class TrucksController : ControllerBase
                     .Include(e => e.EquipmentType)
                     .ToListAsync();
             }
-
+      
             // ================= 5. BUILD CHECK-OUT TABLE =================
 
             var checkoutTable = entryEquipment.Select(e => new
             {
                 Equipment = e.Name,
                 Required = 1,
-                Detected = "✓",
+                Detected = exitEquipmentIds.Contains(e.EquipmentId) ? "✓" : "-",
                 EquipmentId = e.EquipmentId
             }).ToList();
-
 
             var checkOutSummary = new
             {
                 totalRequired = checkoutTable.Count,
-                totalAssigned = entryEquipment.Count
+                totalAssigned = checkoutTable.Count(x => x.Detected == "✓")
             };
-            // ================= 6. BUILD CHECK-IN TABLE =================
 
-            var checkinTable = exitEquipment.Select(e => new
-            {
-                Equipment = e.Name,
-                GateStatus = "MISSING",
-                EquipmentId = e.EquipmentId
-            }).ToList();
+            // ================= 6. BUILD CHECK-IN TABLE =================
+            var checkinTable = entryEquipment
+                .Where(e => !exitEquipmentIds.Contains(e.EquipmentId))
+                .Select(e => new
+                {
+                    Equipment = e.Name,
+                    GateStatus = "MISSING",
+                    EquipmentId = e.EquipmentId
+                })
+                .ToList();
 
             var checkInSummary = new
             {
