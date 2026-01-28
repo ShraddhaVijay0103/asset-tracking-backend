@@ -335,7 +335,7 @@ public class TrucksController : ControllerBase
                     .Include(e => e.EquipmentType)
                     .ToListAsync();
             }
-      
+
             // ================= 5. BUILD CHECK-OUT TABLE =================
 
             var checkoutTable = entryEquipment.Select(e => new
@@ -353,15 +353,32 @@ public class TrucksController : ControllerBase
             };
 
             // ================= 6. BUILD CHECK-IN TABLE =================
-            var checkinTable = entryEquipment
-                .Where(e => !exitEquipmentIds.Contains(e.EquipmentId))
-                .Select(e => new
-                {
-                    Equipment = e.Name,
-                    GateStatus = "MISSING",
-                    EquipmentId = e.EquipmentId
-                })
-                .ToList();
+            var checkinTable = new List<object>();
+
+            if (exitEquipmentIds == null || !exitEquipmentIds.Any())
+            {
+                checkinTable = entryEquipment
+                    .Where(e => !checkoutTable.Any(c => c.EquipmentId == e.EquipmentId))
+                    .Select(e => new
+                    {
+                        Equipment = e.Name,
+                        GateStatus = "MISSING",
+                        EquipmentId = e.EquipmentId
+                    })
+                    .ToList<object>();
+            }
+            else
+            {
+                checkinTable = entryEquipment
+                    .Where(e => !exitEquipmentIds.Contains(e.EquipmentId))
+                    .Select(e => new
+                    {
+                        Equipment = e.Name,
+                        GateStatus = "MISSING",
+                        EquipmentId = e.EquipmentId
+                    })
+                    .ToList<object>();
+            }
 
             var checkInSummary = new
             {
@@ -424,8 +441,5 @@ public class TrucksController : ControllerBase
         public string GateStatus { get; set; }
         public Guid? EquipmentId { get; set; }
     }
-
-
-
 
 }
