@@ -302,6 +302,23 @@ public class TrucksController : ControllerBase
                 .OrderByDescending(e => e.EventTime)
                 .FirstOrDefaultAsync();
 
+            var lastMissingEquipmentCase = await _db.MissingEquipmentCases
+                .Where(e => e.MissingEquipmentCaseId == lastEntryEvent.MissingEquipmentCasesId
+                            && e.StatusId == 4
+                            && e.SiteId == siteId)
+                .FirstOrDefaultAsync();
+
+            List<MissingEquipmentCaseItem> lastMissingEquipmentCaseItems = new List<MissingEquipmentCaseItem>();
+
+            if (lastMissingEquipmentCase != null)
+            {
+                lastMissingEquipmentCaseItems = await _db.MissingEquipmentCaseItems
+                    .Where(e => e.MissingEquipmentCaseId == lastMissingEquipmentCase.MissingEquipmentCaseId
+                                && e.SiteId == siteId
+                                && e.IsRecovered == true)
+                    .ToListAsync();
+            }
+
             // ================= 3. GET ENTRY EQUIPMENT =================
             var entryEquipment = new List<Equipment>();
             var entryEquipmentIds = new List<Guid>();
@@ -357,12 +374,16 @@ public class TrucksController : ControllerBase
 
             if (exitEquipmentIds == null || !exitEquipmentIds.Any())
             {
+                var recoveredEquipmentIds = new HashSet<Guid>(
+                    lastMissingEquipmentCaseItems.Select(i => i.EquipmentId)
+                );
+
                 checkinTable = entryEquipment
                     .Where(e => !checkoutTable.Any(c => c.EquipmentId == e.EquipmentId))
                     .Select(e => new
                     {
                         Equipment = e.Name,
-                        GateStatus = "MISSING",
+                        GateStatus = recoveredEquipmentIds.Contains(e.EquipmentId) ? "Case closed" : "MISSING",
                         EquipmentId = e.EquipmentId
                     })
                     .ToList<object>();

@@ -38,5 +38,8 @@ public class GateEvent
     [Column("site_id")]
     public Guid SiteId { get; set; }
 
+    [Column("missing_equipment_cases_id")]
+    public Guid? MissingEquipmentCasesId { get; set; }
+
     public ICollection<GateEventItem> Items { get; set; } = new List<GateEventItem>();
 }

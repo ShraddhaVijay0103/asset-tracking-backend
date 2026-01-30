@@ -23,4 +23,10 @@ public class GateEventItem
 
     [Column("site_id")]
     public Guid SiteId { get; set; }
+
+    [Column("missing_equipment_cases_item_id")]
+    public Guid? MissingEquipmentCasesItemId { get; set; }
+
+    [Column("missing_equipment_cases_id")]
+    public Guid? MissingEquipmentCasesId { get; set; }
 }
