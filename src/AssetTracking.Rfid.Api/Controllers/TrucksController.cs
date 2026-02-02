@@ -1,4 +1,4 @@
-﻿using AssetTracking.Rfid.Api.Models;
+using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -302,8 +302,8 @@ public class TrucksController : ControllerBase
                 .OrderByDescending(e => e.EventTime)
                 .FirstOrDefaultAsync();
 
-            // ================= 3. GET ENTRY EQUIPMENT =================
-            var entryEquipment = new List<Equipment>();
+      // ================= 3. GET ENTRY EQUIPMENT =================
+      var entryEquipment = new List<Equipment>();
             var entryEquipmentIds = new List<Guid>();
 
             if (lastEntryEvent != null)
@@ -352,18 +352,40 @@ public class TrucksController : ControllerBase
                 totalAssigned = checkoutTable.Count(x => x.Detected == "✓")
             };
 
-            // ================= 6. BUILD CHECK-IN TABLE =================
-            var checkinTable = entryEquipment
-                .Where(e => !exitEquipmentIds.Contains(e.EquipmentId))
-                .Select(e => new
-                {
-                    Equipment = e.Name,
-                    GateStatus = "MISSING",
-                    EquipmentId = e.EquipmentId
-                })
-                .ToList();
+      // ================= 6. BUILD CHECK-IN TABLE =================
+      // checkinTable should be a LIST, not string
+      var checkinTable = new List<object>();
 
-            var checkInSummary = new
+      if (exitEquipmentIds == null || !exitEquipmentIds.Any())
+      {
+        // Nothing checked-in → everything from entry is missing
+        checkinTable = entryEquipment
+            .Where(e => !checkoutTable.Any(c => c.EquipmentId == e.EquipmentId))
+            .Select(e => new
+            {
+              Equipment = e.Name,
+              GateStatus = "MISSING",
+              EquipmentId = e.EquipmentId
+            })
+            .Cast<object>()
+            .ToList();
+      }
+      else
+      {
+        // Partial check-in → missing = entry − exit
+        checkinTable = entryEquipment
+            .Where(e => !exitEquipmentIds.Contains(e.EquipmentId))
+            .Select(e => new
+            {
+              Equipment = e.Name,
+              GateStatus = "MISSING",
+              EquipmentId = e.EquipmentId
+            })
+            .Cast<object>()
+            .ToList();
+      }
+
+      var checkInSummary = new
             {
                 totalRequired = checkoutTable.Count,
                 totalAssigned = exitEquipment.Count

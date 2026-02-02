@@ -23,4 +23,5 @@ public class GateEventItem
 
     [Column("site_id")]
     public Guid SiteId { get; set; }
+
 }
