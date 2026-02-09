@@ -27,7 +27,12 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "https://prosperassettracking.com",
-                "http://localhost:4200"
+                "http://localhost:4200",
+                  "http://localhost:4201",
+                      "http://192.168.1.4:4201",
+
+           
+          "http://192.168.1.117:4201"
             )
             .AllowAnyMethod()
             .AllowAnyHeader();
@@ -38,7 +43,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
             builder.Configuration.GetConnectionString("Postgres")
-            ?? "Host=localhost;Port=5432;Database=assetTracking;Username=postgres;Password=postgres;")
+            ?? "Host=localhost;Port=5432;Database=test;Username=postgres;Password=postgres;")
            .UseSnakeCaseNamingConvention()
 );
 

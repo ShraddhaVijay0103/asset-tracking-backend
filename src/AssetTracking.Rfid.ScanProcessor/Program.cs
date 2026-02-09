@@ -16,7 +16,7 @@ var host = new HostBuilder()
     {
         var configuration = context.Configuration;
         var connectionString = configuration.GetConnectionString("Postgres")
-            ?? "Host=localhost;Port=5432;Database=assetTracking;Username=postgres;Password=postgres;";
+            ?? "Host=localhost;Port=5432;Database=test;Username=postgres;Password=postgres;";
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString));

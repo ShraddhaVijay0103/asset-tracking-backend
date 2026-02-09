@@ -1,4 +1,4 @@
-using AssetTracking.Rfid.Api.Models;
+﻿using AssetTracking.Rfid.Api.Models;
 using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -201,6 +201,129 @@ public class ReportsController : ControllerBase
             .ToListAsync();
 
         return Ok(alerts);
+    }
+    [AllowAnonymous]
+    [HttpGet("report/missing-equipment-cases/{siteId:guid}")]
+    public async Task<IActionResult> MissingCaseReport(Guid siteId)
+    {
+        var items = await _db.MissingEquipmentCaseItems
+            .Where(i => i.SiteId == siteId)
+            .Include(i => i.Equipment)
+                .ThenInclude(e => e.EquipmentType)
+            .Include(i => i.MissingEquipmentCase)
+                .ThenInclude(c => c.Truck)
+                    .ThenInclude(t => t.Driver)
+            .ToListAsync();
+
+        var report = new List<object>();
+
+        foreach (var item in items)
+        {
+            var truckId = item.MissingEquipmentCase.TruckId;
+
+            // ✅ GET ENTRY TIME FROM GateEvents
+            var entryTime = await _db.GateEvents
+                .Where(e => e.TruckId == truckId
+                         && e.SiteId == siteId
+                         && e.EventType == "Entry")
+                .OrderByDescending(e => e.EventTime)
+                .Select(e => e.EventTime)
+                .FirstOrDefaultAsync();
+
+            report.Add(new
+            {
+                CaseId = item.MissingEquipmentCaseId,
+                CaseStatusId = item.MissingEquipmentCase.StatusId,
+
+                TruckNumber = item.MissingEquipmentCase.Truck.TruckNumber,
+                Driver = item.MissingEquipmentCase.Truck.Driver?.FullName,
+
+                Equipment = item.Equipment.Name,
+                EquipmentType = item.Equipment.EquipmentType.Name,
+
+                MissingStatus = "Missing",
+
+                RecoveredStatus = item.IsRecovered ? "Yes" : "No",
+
+                // ✅ NEW COLUMN
+                MissingDetectedTime = entryTime
+            });
+        }
+
+        return Ok(new
+        {
+            SiteId = siteId,
+            TotalRows = report.Count,
+            Rows = report
+        });
+    }
+
+
+
+
+
+    [AllowAnonymous]
+    [HttpGet("report/missing-equipment-case-by-date/{siteId:guid}")]
+    public async Task<IActionResult> MissingCaseReportByDate(
+    Guid siteId,
+    DateTime? date)
+    {
+        var items = await _db.MissingEquipmentCaseItems
+            .Where(i => i.SiteId == siteId)
+            .Include(i => i.Equipment)
+                .ThenInclude(e => e.EquipmentType)
+            .Include(i => i.MissingEquipmentCase)
+                .ThenInclude(c => c.Truck)
+                    .ThenInclude(t => t.Driver)
+            .ToListAsync();
+
+        var report = new List<object>();
+
+        foreach (var item in items)
+        {
+            var truckId = item.MissingEquipmentCase.TruckId;
+
+            // ✅ get entry time (missing detected time)
+            var entryTime = await _db.GateEvents
+                .Where(e => e.TruckId == truckId
+                         && e.SiteId == siteId
+                         && e.EventType == "Entry")
+                .OrderByDescending(e => e.EventTime)
+                .Select(e => e.EventTime)
+                .FirstOrDefaultAsync();
+
+            // ✅ if date selected → match only that day
+            if (date.HasValue)
+            {
+                if (entryTime.Date != date.Value.Date)
+                    continue;
+            }
+
+            report.Add(new
+            {
+                CaseId = item.MissingEquipmentCaseId,
+                CaseStatusId = item.MissingEquipmentCase.StatusId,
+
+                TruckNumber = item.MissingEquipmentCase.Truck?.TruckNumber,
+                Driver = item.MissingEquipmentCase.Truck?.Driver?.FullName,
+
+                Equipment = item.Equipment?.Name,
+                EquipmentType = item.Equipment?.EquipmentType?.Name,
+
+                MissingDetectedTime = entryTime,
+
+                MissingStatus = "Missing",
+                RecoveredStatus = item.IsRecovered ? "Yes" : "No"
+            });
+        }
+
+        return Ok(new
+        {
+            SiteId = siteId,
+            FilterDate = date,
+            TotalRows = report.Count,
+            Rows = report
+        });
     }
 
 }
