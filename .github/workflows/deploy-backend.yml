@@ -1,0 +1,32 @@
+name: Deploy Backend to IIS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    steps:
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+
+    - name: Show dotnet info
+      run: dotnet --info
+
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+
+    - name: Build project
+      run: dotnet build --configuration Release
+
+
+    - name: Publish to IIS folder
+      run: dotnet publish --configuration Release --output C:\publish
+
