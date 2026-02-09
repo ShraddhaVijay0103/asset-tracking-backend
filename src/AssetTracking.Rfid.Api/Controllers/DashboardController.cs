@@ -19,17 +19,7 @@ public class DashboardController : ControllerBase
         _db = db;
     }
 
-    [AllowAnonymous]
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<Equipment>>> GetAll()
-    {
-        var list = await _db.Equipment
-            .Include(e => e.EquipmentType)
-            .Include(e => e.RfidTag)
-            .ToListAsync();
-
-        return Ok(list);
-    }
+  
     [AllowAnonymous]
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummary>> GetSummary()

@@ -58,5 +58,15 @@ public class RfidController : ControllerBase
 
         return Ok(list);
     }
+    [AllowAnonymous]
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<Equipment>>> GetAll()
+    {
+        var list = await _db.Equipment
+            .Include(e => e.EquipmentType)
+            .Include(e => e.RfidTag)
+            .ToListAsync();
 
+        return Ok(list);
+    }
 }
