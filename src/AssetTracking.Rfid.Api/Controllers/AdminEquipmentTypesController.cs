@@ -26,6 +26,22 @@ public class AdminEquipmentTypesController : ControllerBase
         return Ok(list);
     }
 
+
+
+    [AllowAnonymous]
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<Equipment>> GetById(Guid id)
+    {
+        var equipment = await _db.Equipment
+            .Include(e => e.EquipmentType)
+            .Include(e => e.RfidTag)
+            .FirstOrDefaultAsync(e => e.EquipmentId == id);
+
+        if (equipment is null) return NotFound();
+
+        return Ok(equipment);
+    }
+
     [AllowAnonymous]
     [HttpPost]
     public async Task<ActionResult<EquipmentType>> Create([FromBody] EquipmentType type)
