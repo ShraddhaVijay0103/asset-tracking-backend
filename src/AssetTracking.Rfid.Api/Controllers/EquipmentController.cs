@@ -31,6 +31,13 @@ public class EquipmentController : ControllerBase
         return Ok(list);
     }
 
+
+
+
+
+
+
+
     [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<Equipment>> GetById(Guid id)

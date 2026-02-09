@@ -1,4 +1,5 @@
 using AssetTracking.Rfid.Api.Models;
+using AssetTracking.Rfid.Domain.Entities;
 using AssetTracking.Rfid.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +18,22 @@ public class DashboardController : ControllerBase
     {
         _db = db;
     }
+
+
+
+    [AllowAnonymous]
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<Equipment>>> GetAll()
+    {
+        var list = await _db.Equipment
+            .Include(e => e.EquipmentType)
+            .Include(e => e.RfidTag)
+            .ToListAsync();
+
+        return Ok(list);
+    }
+
+
 
     [AllowAnonymous]
     [HttpGet("summary")]
