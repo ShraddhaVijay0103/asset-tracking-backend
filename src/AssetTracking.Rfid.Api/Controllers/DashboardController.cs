@@ -18,6 +18,7 @@ public class DashboardController : ControllerBase
     {
         _db = db;
     }
+
     [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Equipment>>> GetAll()
@@ -29,7 +30,6 @@ public class DashboardController : ControllerBase
 
         return Ok(list);
     }
-
     [AllowAnonymous]
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummary>> GetSummary()
