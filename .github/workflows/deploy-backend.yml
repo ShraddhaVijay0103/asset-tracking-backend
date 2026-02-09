@@ -10,19 +10,23 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Restore
-        run: dotnet restore
 
-      - name: Build
-        run: dotnet build --configuration Release
+    - name: Show dotnet info
+      run: dotnet --info
 
-      - name: Publish
-        run: dotnet publish -c Release -o C:\publish
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+
+    - name: Build project
+      run: dotnet build --configuration Release
+
+
+    - name: Publish to IIS folder
+      run: dotnet publish --configuration Release --output C:\publish
+
