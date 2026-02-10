@@ -10,23 +10,24 @@ jobs:
     runs-on: self-hosted
 
     steps:
+    - uses: actions/checkout@v4
 
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-
-    - name: Show dotnet info
-      run: dotnet --info
-
-
-    - name: Restore dependencies
+    - name: Restore
       run: dotnet restore
 
-
-    - name: Build project
+    - name: Build
       run: dotnet build --configuration Release
 
+    - name: Stop IIS
+      run: iisreset /stop
 
-    - name: Publish to IIS folder
-      run: dotnet publish --configuration Release --output C:\publish
+    - name: Clean publish folder
+      run: |
+        if (Test-Path C:\publish) { Remove-Item C:\publish\* -Recurse -Force }
+
+    - name: Publish
+      run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\publish
+
+    - name: Start IIS
+      run: iisreset /start
 
