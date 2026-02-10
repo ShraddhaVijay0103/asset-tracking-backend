@@ -94,4 +94,5 @@ public class AlertsController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(rules);
     }
+
 }
