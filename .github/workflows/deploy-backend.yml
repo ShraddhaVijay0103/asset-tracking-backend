@@ -10,24 +10,29 @@ jobs:
     runs-on: self-hosted
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Restore
-      run: dotnet restore
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
 
-    - name: Build
-      run: dotnet build --configuration Release
+      - name: Restore
+        run: dotnet restore
 
-    - name: Stop IIS
-      run: iisreset /stop
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
 
-    - name: Clean publish folder
-      run: |
-        if (Test-Path C:\publish) { Remove-Item C:\publish\* -Recurse -Force }
+      
+      - name: Publish API
+        run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\temp_publish
 
-    - name: Publish
-      run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\publish
+ 
+      - name: Copy files to IIS folder
+        run: |
+          xcopy C:\temp_publish\* C:\publish\ /E /Y /I
 
-    - name: Start IIS
-      run: iisreset /start
-
+      - name: Recycle App Pool
+        run: |
+          %windir%\system32\inetsrv\appcmd recycle apppool /apppool.name:"AssetRfidApi"
