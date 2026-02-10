@@ -1,4 +1,4 @@
-name: Deploy Backend to IIS
+name: Build and Deploy .NET API to IIS
 
 on:
   push:
@@ -6,16 +6,22 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: self-hosted
+
+    env:
+      PUBLISH_DIR: C:\publish
+      BUILD_DIR: C:\actions_build
 
     steps:
 
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Check dotnet
-      run: dotnet --version
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
 
     - name: Restore
       run: dotnet restore
@@ -23,9 +29,29 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
-    - name: Publish
-      run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\temp_publish
-
-    - name: Copy to IIS folder
+    # ✅ publish ONLY api project — not solution
+    - name: Publish API
       run: |
-        robocopy C:\temp_publish C:\publish /MIR
+        dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj `
+          -c Release `
+          -o $env:BUILD_DIR `
+          --no-build
+
+    # ✅ IIS safe shutdown method (production standard)
+    - name: Put app offline
+      run: echo offline > $env:PUBLISH_DIR\app_offline.htm
+
+    # wait to release file locks
+    - name: Wait for IIS to release files
+      run: Start-Sleep -Seconds 5
+
+    # ✅ mirror deploy (best practice)
+    - name: Deploy files to IIS folder
+      run: robocopy $env:BUILD_DIR $env:PUBLISH_DIR /MIR /R:2 /W:2
+
+    # ✅ bring app back online
+    - name: Remove offline file
+      run: del $env:PUBLISH_DIR\app_offline.htm
+
+    - name: Done
+      run: echo "Deployment complete"
