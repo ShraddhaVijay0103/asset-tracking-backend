@@ -18,10 +18,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.0.x
+    # ❌ setup-dotnet removed
+
+    - name: Check dotnet version
+      run: dotnet --version
 
     - name: Restore
       run: dotnet restore
@@ -29,7 +29,6 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
-    # ✅ publish ONLY api project — not solution
     - name: Publish API
       run: |
         dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj `
@@ -37,21 +36,17 @@ jobs:
           -o $env:BUILD_DIR `
           --no-build
 
-    # ✅ IIS safe shutdown method (production standard)
     - name: Put app offline
       run: echo offline > $env:PUBLISH_DIR\app_offline.htm
 
-    # wait to release file locks
     - name: Wait for IIS to release files
       run: Start-Sleep -Seconds 5
 
-    # ✅ mirror deploy (best practice)
-    - name: Deploy files to IIS folder
+    - name: Deploy files
       run: robocopy $env:BUILD_DIR $env:PUBLISH_DIR /MIR /R:2 /W:2
 
-    # ✅ bring app back online
     - name: Remove offline file
       run: del $env:PUBLISH_DIR\app_offline.htm
 
     - name: Done
-      run: echo "Deployment complete"
+      run: echo "Deploy complete"
