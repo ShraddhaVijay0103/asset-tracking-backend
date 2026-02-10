@@ -1,4 +1,4 @@
-name: Build and Deploy API to IIS
+name: Deploy API to IIS
 
 on:
   push:
@@ -10,14 +10,15 @@ jobs:
     runs-on: self-hosted
 
     env:
-      BUILD_DIR: C:\actions_build
-      PUBLISH_DIR: C:\publish
+      BUILD_DIR: C:\gh_build
+      IIS_DIR: C:\publish
 
     steps:
 
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
 
+    # ✅ dotnet already installed on runner — no setup-dotnet
     - name: Check dotnet
       run: dotnet --version
 
@@ -27,25 +28,26 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
-    - name: Publish
+    # ✅ YOUR REAL API PROJECT
+    - name: Publish API
       run: |
         dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj `
           -c Release `
           -o $env:BUILD_DIR `
           --no-build
 
-    # ⭐ THIS IS THE KEY STEP
-    - name: Put IIS app offline
-      run: echo offline > $env:PUBLISH_DIR\app_offline.htm
+    # ✅ IIS SAFE DEPLOY — no admin needed
+    - name: Put app offline
+      run: echo offline > $env:IIS_DIR\app_offline.htm
 
-    - name: Wait for IIS to release dlls
-      run: Start-Sleep -Seconds 8
+    - name: Wait for IIS unlock
+      run: Start-Sleep -Seconds 12
 
-    - name: Copy files safely
-      run: robocopy $env:BUILD_DIR $env:PUBLISH_DIR /MIR /R:3 /W:5
+    - name: Copy files to IIS
+      run: robocopy $env:BUILD_DIR $env:IIS_DIR /MIR /R:2 /W:3
 
     - name: Remove offline file
-      run: del $env:PUBLISH_DIR\app_offline.htm
+      run: del $env:IIS_DIR\app_offline.htm
 
-    - name: Done
-      run: echo "Deploy Success"
+    - name: Deploy done
+      run: echo SUCCESS
