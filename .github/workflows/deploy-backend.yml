@@ -13,18 +13,40 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ---------- DOTNET CHECK ----------
       - name: Check dotnet
-        run: dotnet --version
+        run: dotnet --info
 
+      # ---------- RESTORE ----------
       - name: Restore
         run: dotnet restore
 
+      # ---------- BUILD ----------
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      # ---------- PUBLISH TO TEMP ----------
+      # ⚠️ IMPORTANT — project path check karo
       - name: Publish API
-        run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\temp_publish
+        run: |
+          dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj `
+            --configuration Release `
+            --output C:\temp_publish
 
+      # ---------- STOP IIS APP POOL ----------
+      # ⚠️ App Pool name = AssetRfidApi (tumhare IIS se)
+      - name: Stop App Pool
+        run: |
+          Import-Module WebAdministration
+          Stop-WebAppPool -Name "AssetRfidApi"
+
+      # ---------- COPY FILES ----------
       - name: Copy to IIS folder
         run: |
-          xcopy C:\temp_publish\* C:\publish\ /E /Y /I
+          robocopy C:\temp_publish C:\publish /MIR
+
+      # ---------- START IIS APP POOL ----------
+      - name: Start App Pool
+        run: |
+          Import-Module WebAdministration
+          Start-WebAppPool -Name "AssetRfidApi"
