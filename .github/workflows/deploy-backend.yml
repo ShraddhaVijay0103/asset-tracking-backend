@@ -10,23 +10,21 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Check dotnet
+        run: dotnet --version
 
+      - name: Restore
+        run: dotnet restore
 
-    - name: Show dotnet info
-      run: dotnet --info
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
 
+      - name: Publish API
+        run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\temp_publish
 
-    - name: Restore dependencies
-      run: dotnet restore
-
-
-    - name: Build project
-      run: dotnet build --configuration Release
-
-
-    - name: Publish to IIS folder
-      run: dotnet publish --configuration Release --output C:\publish
-
+      - name: Copy to IIS folder
+        run: |
+          xcopy C:\temp_publish\* C:\publish\ /E /Y /I
