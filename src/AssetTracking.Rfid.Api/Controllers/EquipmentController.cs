@@ -135,19 +135,7 @@ public class EquipmentController : ControllerBase
     }
 
 
-    [AllowAnonymous]
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<Equipment>>> GetAll()
-    {
-        var list = await _db.Equipment
-            .Include(e => e.EquipmentType)
-            .Include(e => e.RfidTag)
-            .ToListAsync();
-
-        return Ok(list);
-    }
-
-
+  
 
 
 

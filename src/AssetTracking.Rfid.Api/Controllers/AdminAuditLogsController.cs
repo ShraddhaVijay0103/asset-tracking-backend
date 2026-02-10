@@ -29,4 +29,28 @@ public class AdminAuditLogsController : ControllerBase
 
         return Ok(list);
     }
+
+
+       [AllowAnonymous]
+    [HttpGet("rules")]
+    public async Task<ActionResult<AlertRules>> GetRules()
+    {
+        var rules = await _db.AlertRules.FirstOrDefaultAsync();
+        if (rules is null)
+        {
+            rules = new AlertRules
+            {
+                AlertRulesId = Guid.NewGuid(),
+                MissingItemThreshold = 1,
+                OverdueMinutes = 30,
+                NotifyEmail = true,
+                NotifySms = true,
+                NotifyPush = false
+            };
+            _db.AlertRules.Add(rules);
+            await _db.SaveChangesAsync();
+        }
+
+        return Ok(rules);
+    }
 }
