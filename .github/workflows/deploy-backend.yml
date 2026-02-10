@@ -13,10 +13,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
+      - name: Check dotnet
+        run: dotnet --version
 
       - name: Restore
         run: dotnet restore
@@ -24,15 +22,9 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      
       - name: Publish API
         run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\temp_publish
 
- 
-      - name: Copy files to IIS folder
+      - name: Copy to IIS folder
         run: |
           xcopy C:\temp_publish\* C:\publish\ /E /Y /I
-
-      - name: Recycle App Pool
-        run: |
-          %windir%\system32\inetsrv\appcmd recycle apppool /apppool.name:"AssetRfidApi"
