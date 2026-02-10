@@ -10,43 +10,22 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      # ---------- DOTNET CHECK ----------
-      - name: Check dotnet
-        run: dotnet --info
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      # ---------- RESTORE ----------
-      - name: Restore
-        run: dotnet restore
+    - name: Check dotnet
+      run: dotnet --version
 
-      # ---------- BUILD ----------
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
+    - name: Restore
+      run: dotnet restore
 
-      # ---------- PUBLISH TO TEMP ----------
-      # ⚠️ IMPORTANT — project path check karo
-      - name: Publish API
-        run: |
-          dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj `
-            --configuration Release `
-            --output C:\temp_publish
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
 
-      # ---------- STOP IIS APP POOL ----------
-      # ⚠️ App Pool name = AssetRfidApi (tumhare IIS se)
-      - name: Stop App Pool
-        run: |
-          Import-Module WebAdministration
-          Stop-WebAppPool -Name "AssetRfidApi"
+    - name: Publish
+      run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\temp_publish
 
-      # ---------- COPY FILES ----------
-      - name: Copy to IIS folder
-        run: |
-          robocopy C:\temp_publish C:\publish /MIR
-
-      # ---------- START IIS APP POOL ----------
-      - name: Start App Pool
-        run: |
-          Import-Module WebAdministration
-          Start-WebAppPool -Name "AssetRfidApi"
+    - name: Copy to IIS folder
+      run: |
+        robocopy C:\temp_publish C:\publish /MIR
