@@ -41,17 +41,19 @@ jobs:
     - name: Wait unlock
       run: Start-Sleep -Seconds 15
 
-    # ✅ FIXED — PowerShell safe
     - name: Kill dotnet locks
       run: |
         Get-Process dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
 
-    # ✅ FIXED — CMD variable syntax
+    # ✅ ONLY FIXED STEP — robocopy exit code safe
     - name: Copy files to IIS
-      run: robocopy %BUILD_DIR% %IIS_DIR% /MIR /R:2 /W:3
       shell: cmd
+      run: |
+        robocopy %BUILD_DIR% %IIS_DIR% /MIR /R:2 /W:3
+        set RC=%ERRORLEVEL%
+        if %RC% LEQ 3 exit /b 0
+        exit /b %RC%
 
-    # ✅ FIXED — PowerShell safe delete
     - name: Remove offline file
       run: |
         if (Test-Path "$env:IIS_DIR\app_offline.htm") {
