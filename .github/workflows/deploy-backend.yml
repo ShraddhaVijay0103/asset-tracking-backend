@@ -1,11 +1,12 @@
-name: Deploy API to IIS
+name: Build and Deploy API to IIS
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: self-hosted
 
     env:
@@ -13,31 +14,80 @@ jobs:
       IIS_DIR: C:\publish
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
-      # NO setup-dotnet step — we use server-installed SDK
+    # -------------------------
+    # Checkout
+    # -------------------------
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Restore
-        run: dotnet restore
+    # -------------------------
+    # Use already installed .NET (skip install)
+    # -------------------------
+    - name: Check dotnet
+      run: dotnet --version
 
-      - name: Build
-        run: dotnet build -c Release
+    # -------------------------
+    # Clean build folder
+    # -------------------------
+    - name: Clean build dir
+      run: |
+        if (Test-Path $env:BUILD_DIR) { Remove-Item $env:BUILD_DIR -Recurse -Force }
+        New-Item -ItemType Directory -Path $env:BUILD_DIR
 
-      - name: Publish
-        run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o $env:BUILD_DIR
+    # -------------------------
+    # Restore
+    # -------------------------
+    - name: Restore
+      run: dotnet restore
 
-      - name: Put app offline
-        run: echo offline > "$env:IIS_DIR\app_offline.htm"
+    # -------------------------
+    # Build
+    # -------------------------
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
 
-      - name: Wait unlock
-        run: timeout /t 15
+    # -------------------------
+    # Publish
+    # -------------------------
+    - name: Publish API
+      run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o $env:BUILD_DIR
 
-      - name: Kill dotnet locks
-        run: taskkill /F /IM dotnet.exe || exit 0
+    # -------------------------
+    # Put IIS app offline
+    # -------------------------
+    - name: Put app offline
+      run: echo offline > "$env:IIS_DIR\app_offline.htm"
 
-      - name: Copy files
-        run: robocopy $env:BUILD_DIR $env:IIS_DIR /MIR /R:2 /W:3
+    # -------------------------
+    # Wait for IIS unlock (PowerShell safe)
+    # -------------------------
+    - name: Wait unlock
+      run: Start-Sleep -Seconds 15
 
-      - name: Remove offline file
-        run: del "$env:IIS_DIR\app_offline.htm"
+    # -------------------------
+    # Kill locked dotnet processes
+    # -------------------------
+    - name: Kill dotnet locks
+      run: taskkill /F /IM dotnet.exe || exit 0
+
+    # -------------------------
+    # Copy files to IIS (robocopy safe)
+    # -------------------------
+    - name: Copy files to IIS
+      run: robocopy $env:BUILD_DIR $env:IIS_DIR /MIR /R:2 /W:3
+
+    # robocopy exit codes handling
+      shell: cmd
+
+    # -------------------------
+    # Remove offline file
+    # -------------------------
+    - name: Remove offline file
+      run: del "$env:IIS_DIR\app_offline.htm" || exit 0
+
+    # -------------------------
+    # Done
+    # -------------------------
+    - name: Deploy done
+      run: echo "Deployment completed"
