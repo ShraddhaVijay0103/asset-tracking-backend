@@ -15,79 +15,48 @@ jobs:
 
     steps:
 
-    # -------------------------
-    # Checkout
-    # -------------------------
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # -------------------------
-    # Use already installed .NET (skip install)
-    # -------------------------
     - name: Check dotnet
       run: dotnet --version
 
-    # -------------------------
-    # Clean build folder
-    # -------------------------
     - name: Clean build dir
       run: |
         if (Test-Path $env:BUILD_DIR) { Remove-Item $env:BUILD_DIR -Recurse -Force }
         New-Item -ItemType Directory -Path $env:BUILD_DIR
 
-    # -------------------------
-    # Restore
-    # -------------------------
     - name: Restore
       run: dotnet restore
 
-    # -------------------------
-    # Build
-    # -------------------------
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
-    # -------------------------
-    # Publish
-    # -------------------------
     - name: Publish API
       run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o $env:BUILD_DIR
 
-    # -------------------------
-    # Put IIS app offline
-    # -------------------------
     - name: Put app offline
       run: echo offline > "$env:IIS_DIR\app_offline.htm"
 
-    # -------------------------
-    # Wait for IIS unlock (PowerShell safe)
-    # -------------------------
     - name: Wait unlock
       run: Start-Sleep -Seconds 15
 
-    # -------------------------
-    # Kill locked dotnet processes
-    # -------------------------
+    # ✅ FIXED — PowerShell safe
     - name: Kill dotnet locks
-      run: taskkill /F /IM dotnet.exe || exit 0
+      run: |
+        Get-Process dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
 
-    # -------------------------
-    # Copy files to IIS (robocopy safe)
-    # -------------------------
+    # ✅ FIXED — CMD variable syntax
     - name: Copy files to IIS
-      run: robocopy $env:BUILD_DIR $env:IIS_DIR /MIR /R:2 /W:3
-
-    # robocopy exit codes handling
+      run: robocopy %BUILD_DIR% %IIS_DIR% /MIR /R:2 /W:3
       shell: cmd
 
-    # -------------------------
-    # Remove offline file
-    # -------------------------
+    # ✅ FIXED — PowerShell safe delete
     - name: Remove offline file
-      run: del "$env:IIS_DIR\app_offline.htm" || exit 0
+      run: |
+        if (Test-Path "$env:IIS_DIR\app_offline.htm") {
+          Remove-Item "$env:IIS_DIR\app_offline.htm" -Force
+        }
 
-    # -------------------------
-    # Done
-    # -------------------------
     - name: Deploy done
       run: echo "Deployment completed"
