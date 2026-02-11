@@ -409,6 +409,21 @@ public class AdminUsersController : ControllerBase
         });
     }
 
+
+
+    [AllowAnonymous]
+    [HttpGet("summary2")]
+    public async Task<ActionResult<IEnumerable<AuditLog>>> GetAuditLogs()
+    {
+        var list = await _db.AuditLogs
+            .OrderByDescending(a => a.Timestamp)
+            .Take(200)
+            .ToListAsync();
+
+        return Ok(list);
+    }
+
+
     [AllowAnonymous]
     [HttpPost("SiteWiseToken/{userId}/{siteId}")]
     public async Task<IActionResult> SiteWiseToken(Guid userId, Guid siteId)
