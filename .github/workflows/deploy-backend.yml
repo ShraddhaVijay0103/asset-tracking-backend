@@ -1,58 +1,43 @@
-name: Build and Deploy API to IIS
+name: Deploy API to IIS
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-deploy:
+  deploy:
     runs-on: self-hosted
 
     env:
-      BUILD_DIR: C:\gh_build
       IIS_DIR: C:\publish
+      BUILD_DIR: C:\gh_build
 
     steps:
+      - uses: actions/checkout@v4
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Use .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
 
-    # ✅ Runner already has dotnet — just verify
-    - name: Check dotnet
-      run: dotnet --info
+      - name: Restore
+        run: dotnet restore
 
-    - name: Restore
-      run: dotnet restore src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj
+      - name: Publish API
+        run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o $env:BUILD_DIR
 
-    - name: Build
-      run: dotnet build src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj --configuration Release --no-restore
+      # take site offline (no admin IIS commands needed)
+      - name: Put app offline
+        run: echo "offline" > "$env:IIS_DIR\app_offline.htm"
 
-    - name: Publish
-      run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o $env:BUILD_DIR
+      - name: Wait for IIS unlock
+        run: Start-Sleep -Seconds 15
 
-    # ✅ Safest IIS unlock method
-    - name: Put app offline
-      shell: powershell
-      run: |
-        New-Item "$env:IIS_DIR\app_offline.htm" -ItemType File -Force
-        Start-Sleep -Seconds 10
+      - name: Kill dotnet locks
+        run: taskkill /F /IM dotnet.exe || exit 0
 
-    # ✅ Kill dotnet process to unlock DLL
-    - name: Kill dotnet processes
-      shell: powershell
-      run: |
-        Get-Process dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
+      - name: Copy files
+        run: robocopy $env:BUILD_DIR $env:IIS_DIR /MIR /R:2 /W:3
 
-    # ✅ Copy files
-    - name: Copy files to IIS
-      run: robocopy $env:BUILD_DIR $env:IIS_DIR /MIR /R:2 /W:3
-
-    # ✅ Bring app back online
-    - name: Remove offline file
-      shell: powershell
-      run: |
-        Remove-Item "$env:IIS_DIR\app_offline.htm" -ErrorAction SilentlyContinue
-
-    - name: Done
-      run: echo "Deployment complete"
-
+      - name: Remove offline file
+        run: del "$env:IIS_DIR\app_offline.htm" -ErrorAction SilentlyContinue
