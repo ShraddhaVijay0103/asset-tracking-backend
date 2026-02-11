@@ -1,4 +1,4 @@
-name: Deploy Backend to IIS
+name: Build and Deploy API to IIS
 
 on:
   push:
@@ -9,22 +9,56 @@ jobs:
   build-and-deploy:
     runs-on: self-hosted
 
+    env:
+      BUILD_DIR: C:\gh_build
+      IIS_DIR: C:\publish
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Check dotnet
-        run: dotnet --version
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Restore
-        run: dotnet restore
+    - name: Check dotnet
+      run: dotnet --version
 
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
+    - name: Clean build dir
+      run: |
+        if (Test-Path $env:BUILD_DIR) { Remove-Item $env:BUILD_DIR -Recurse -Force }
+        New-Item -ItemType Directory -Path $env:BUILD_DIR
 
-      - name: Publish API
-        run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o C:\temp_publish
+    - name: Restore
+      run: dotnet restore
 
-      - name: Copy to IIS folder
-        run: |
-          xcopy C:\temp_publish\* C:\publish\ /E /Y /I
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Publish API
+      run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o $env:BUILD_DIR
+
+    - name: Put app offline
+      run: echo offline > "$env:IIS_DIR\app_offline.htm"
+
+    - name: Wait unlock
+      run: Start-Sleep -Seconds 15
+
+    - name: Kill dotnet locks
+      run: |
+        Get-Process dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
+
+    # ✅ ONLY FIXED STEP — robocopy exit code safe
+    - name: Copy files to IIS
+      shell: cmd
+      run: |
+        robocopy %BUILD_DIR% %IIS_DIR% /MIR /R:2 /W:3
+        set RC=%ERRORLEVEL%
+        if %RC% LEQ 3 exit /b 0
+        exit /b %RC%
+
+    - name: Remove offline file
+      run: |
+        if (Test-Path "$env:IIS_DIR\app_offline.htm") {
+          Remove-Item "$env:IIS_DIR\app_offline.htm" -Force
+        }
+
+    - name: Deploy done
+      run: echo "Deployment completed"
