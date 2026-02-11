@@ -9,29 +9,29 @@ jobs:
     runs-on: self-hosted
 
     env:
-      IIS_DIR: C:\publish
       BUILD_DIR: C:\gh_build
+      IIS_DIR: C:\publish
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Use .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
+      # NO setup-dotnet step — we use server-installed SDK
 
       - name: Restore
         run: dotnet restore
 
-      - name: Publish API
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Publish
         run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o $env:BUILD_DIR
 
-      # take site offline (no admin IIS commands needed)
       - name: Put app offline
-        run: echo "offline" > "$env:IIS_DIR\app_offline.htm"
+        run: echo offline > "$env:IIS_DIR\app_offline.htm"
 
-      - name: Wait for IIS unlock
-        run: Start-Sleep -Seconds 15
+      - name: Wait unlock
+        run: timeout /t 15
 
       - name: Kill dotnet locks
         run: taskkill /F /IM dotnet.exe || exit 0
@@ -40,4 +40,4 @@ jobs:
         run: robocopy $env:BUILD_DIR $env:IIS_DIR /MIR /R:2 /W:3
 
       - name: Remove offline file
-        run: del "$env:IIS_DIR\app_offline.htm" -ErrorAction SilentlyContinue
+        run: del "$env:IIS_DIR\app_offline.htm"
