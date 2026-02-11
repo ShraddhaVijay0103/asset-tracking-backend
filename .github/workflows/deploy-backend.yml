@@ -1,12 +1,11 @@
-name: Deploy API to IIS
+name: Build and Deploy API to IIS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  deploy:
+  build-deploy:
     runs-on: self-hosted
 
     env:
@@ -18,36 +17,42 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # ✅ dotnet already installed on runner — no setup-dotnet
+    # ✅ Runner already has dotnet — just verify
     - name: Check dotnet
-      run: dotnet --version
+      run: dotnet --info
 
     - name: Restore
-      run: dotnet restore
+      run: dotnet restore src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj
 
     - name: Build
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj --configuration Release --no-restore
 
-    # ✅ YOUR REAL API PROJECT
-    - name: Publish API
-      run: |
-        dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj `
-          -c Release `
-          -o $env:BUILD_DIR `
-          --no-build
+    - name: Publish
+      run: dotnet publish src/AssetTracking.Rfid.Api/AssetTracking.Rfid.Api.csproj -c Release -o $env:BUILD_DIR
 
-    # ✅ IIS SAFE DEPLOY — no admin needed
+    # ✅ Safest IIS unlock method
     - name: Put app offline
-      run: echo offline > $env:IIS_DIR\app_offline.htm
+      shell: powershell
+      run: |
+        New-Item "$env:IIS_DIR\app_offline.htm" -ItemType File -Force
+        Start-Sleep -Seconds 10
 
-    - name: Wait for IIS unlock
-      run: Start-Sleep -Seconds 12
+    # ✅ Kill dotnet process to unlock DLL
+    - name: Kill dotnet processes
+      shell: powershell
+      run: |
+        Get-Process dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
 
+    # ✅ Copy files
     - name: Copy files to IIS
       run: robocopy $env:BUILD_DIR $env:IIS_DIR /MIR /R:2 /W:3
 
+    # ✅ Bring app back online
     - name: Remove offline file
-      run: del $env:IIS_DIR\app_offline.htm
+      shell: powershell
+      run: |
+        Remove-Item "$env:IIS_DIR\app_offline.htm" -ErrorAction SilentlyContinue
 
-    - name: Deploy done
-      run: echo SUCCESS
+    - name: Done
+      run: echo "Deployment complete"
+
